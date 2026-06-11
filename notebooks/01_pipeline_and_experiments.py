@@ -27,12 +27,30 @@ import os
 import warnings
 import numpy as np
 import pandas as pd
+
+# When run as a plain .py script (no Jupyter/Colab), force a non-interactive
+# matplotlib backend so plt.show() never blocks waiting for a GUI window to be
+# closed — that would hang a headless run forever. Figures are saved to results/
+# either way; inline display still works under IPython where get_ipython exists.
+import matplotlib
+try:
+    get_ipython()  # noqa: F821 — only defined inside IPython/Jupyter/Colab
+except NameError:
+    matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
+
+# macOS OpenMP guard — must run before `import shap`, which eagerly imports
+# torch. LightGBM links Homebrew's libomp while torch bundles its own; whichever
+# OpenMP runtime initialises first wins, and LightGBM loads its copy lazily on
+# the first .fit(). Forcing that fit here, before torch loads, lets the two
+# runtimes coexist instead of segfaulting at training time. No-op on Linux/Colab.
+import lightgbm as lgb
+lgb.LGBMClassifier(n_estimators=1).fit(np.zeros((4, 1)), [0, 1, 0, 1])
+
 import shap
 import xgboost as xgb
-import lightgbm as lgb
 
 from sklearn.linear_model   import LogisticRegression
 from sklearn.ensemble       import RandomForestClassifier
@@ -44,8 +62,8 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.metrics        import (roc_auc_score, average_precision_score,
                                     f1_score, precision_score, recall_score,
                                     brier_score_loss, confusion_matrix,
-                                    RocCurveDisplay, PrecisionRecallDisplay,
-                                    CalibrationDisplay)
+                                    RocCurveDisplay, PrecisionRecallDisplay)
+from sklearn.calibration     import CalibrationDisplay
 from imblearn.over_sampling import SMOTE
 from imblearn.pipeline      import Pipeline as ImbPipeline
 from statsmodels.stats.contingency_tables import mcnemar
@@ -59,7 +77,11 @@ SEED = 42
 os.environ['PYTHONHASHSEED'] = str(SEED)
 np.random.seed(SEED)
 
-print("Imports and seeds set. numpy seed:", SEED)
+# All figures, metrics, models and config land here (per PROJECT_GUIDE §1).
+RESULTS_DIR = "results"
+os.makedirs(RESULTS_DIR, exist_ok=True)
+
+print("✅ Imports and seeds set. numpy seed:", SEED)
 print("   XGBoost:", xgb.__version__,
       "| LightGBM:", lgb.__version__,
       "| SHAP:", shap.__version__)
@@ -145,12 +167,18 @@ def build_schema_dataframe(n=20):
          "Western", "Brong-Ahafo", "Northern", "Other"],
         n, p=[0.22, 0.18, 0.12, 0.10, 0.10, 0.08, 0.10, 0.10]
     )
-    # Target: loosely correlated with CGPA and mock performance
-    logit = (-0.5 * df["programme_cgpa"]
-              - 0.02 * df[[f"mock_{s}" for s in NMC_SUBJECTS]].mean(axis=1)
-              + rng.normal(0, 0.5, n))
+    # Target: loosely correlated with CGPA and mock performance.
+    # Center the linear predictor on its own mean so the synthetic fail
+    # rate lands near 50% (the national NMC-LE first-attempt rate);
+    # uncentered, typical students sit far below threshold and the
+    # generated target collapses to all-Pass.
+    linear = (-0.5 * df["programme_cgpa"]
+              - 0.02 * df[[f"mock_{s}" for s in NMC_SUBJECTS]].mean(axis=1))
+    logit = (linear - linear.mean()) + rng.normal(0, 0.5, n)
     prob_fail = 1 / (1 + np.exp(-logit))
-    df[TARGET] = (prob_fail > 0.5).astype(int)
+    # Keep as bool to match the boolean sdtype declared in the SDV metadata;
+    # the sampled output is cast back to int after generation.
+    df[TARGET] = prob_fail > 0.5
     return df
 
 # Build reference schema and fit SDV synthesiser
@@ -198,7 +226,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
 
-    # ── 1. Average CA and mock scores 
+    # ── 1. Average CA and mock scores ──────────────────────────
     df["ca_avg"]   = df[CA_COLS].mean(axis=1)
     df["mock_avg"] = df[MOCK_COLS].mean(axis=1)
 
@@ -214,7 +242,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         df[f"weak_ca_{s}"]   = (df[f"ca_{s}"]   < 50).astype(int)
         df[f"weak_mock_{s}"] = (df[f"mock_{s}"] < 50).astype(int)
 
-    # ── 5. Total weak subjects count
+    # ── 5. Total weak subjects count ─────────────────────────────
     weak_ca_cols   = [f"weak_ca_{s}"   for s in NMC_SUBJECTS]
     weak_mock_cols = [f"weak_mock_{s}" for s in NMC_SUBJECTS]
     df["n_weak_ca_subjects"]   = df[weak_ca_cols].sum(axis=1)
@@ -257,15 +285,18 @@ print(f"   Total features after engineering: {len(ALL_FEATURES_V2)}")
 print(f"   Engineered features added: {len(ENGINEERED_NUMERIC)}")
 
 
-
+# ─────────────────────────────────────────────────────────────
 # CELL 6 — Load real data (when available)
 # Currently loads synthetic data as a placeholder.
 # When real data arrives: uncomment the pd.read_csv line,
 # point to your Google Drive path, and comment out syn_df.
 # EVERYTHING BELOW THIS CELL RUNS UNCHANGED.
 # ─────────────────────────────────────────────────────────────
-from google.colab import drive
-# drive.mount('/content/drive')   # ← uncomment when using Drive
+try:
+    from google.colab import drive
+    # drive.mount('/content/drive')   # ← uncomment when using Drive
+except ModuleNotFoundError:
+    pass  # not on Colab — running locally, Drive mount not needed
 
 # ── Option A: Load real anonymised data (uncomment when ready) ──
 # REAL_DATA_PATH = "/content/drive/MyDrive/nursing_data/anonymised_records.csv"
@@ -442,9 +473,9 @@ print("✅ Baseline models trained and evaluated on test set.")
 print_metrics(baseline_results)
 
 # Save for later comparison
-joblib.dump(lr,  "lr_baseline.pkl")
-joblib.dump(rf,  "rf_baseline.pkl")
-joblib.dump(lgbm_clf, "lgbm_baseline.pkl")
+joblib.dump(lr,  os.path.join(RESULTS_DIR, "lr_baseline.pkl"))
+joblib.dump(rf,  os.path.join(RESULTS_DIR, "rf_baseline.pkl"))
+joblib.dump(lgbm_clf, os.path.join(RESULTS_DIR, "lgbm_baseline.pkl"))
 print("\n   Models saved.")
 
 
@@ -488,8 +519,8 @@ print(f"   Best iteration: {xgb_clf.best_iteration}")
 all_results = baseline_results + [xgb_res]
 print_metrics(all_results)
 
-joblib.dump(xgb_clf, "xgboost_model.pkl")
-print("\n   Model saved → xgboost_model.pkl")
+joblib.dump(xgb_clf, os.path.join(RESULTS_DIR, "xgboost_model.pkl"))
+print("\n   Model saved → results/xgboost_model.pkl")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -521,7 +552,7 @@ plt.title("Global SHAP Feature Importance — NMC-LE Failure Prediction\n"
           "(SYNTHETIC DATA — for pipeline testing only)",
           fontsize=11, style="italic")
 plt.tight_layout()
-plt.savefig("shap_beeswarm.png", dpi=150, bbox_inches="tight")
+plt.savefig(os.path.join(RESULTS_DIR, "shap_beeswarm.png"), dpi=150, bbox_inches="tight")
 plt.show()
 print("   Plot saved → shap_beeswarm.png")
 
@@ -542,8 +573,8 @@ if len(fail_idx) > 0:
         plt.title(f"Student {rank} — Predicted Fail (p={xgb_proba[idx]:.3f})\n"
                   "(SYNTHETIC DATA)", fontsize=10, style="italic")
         plt.tight_layout()
-        plt.savefig(f"shap_waterfall_student{rank}.png", dpi=150,
-                    bbox_inches="tight")
+        plt.savefig(os.path.join(RESULTS_DIR, f"shap_waterfall_student{rank}.png"),
+                    dpi=150, bbox_inches="tight")
         plt.show()
     print(f"✅ Waterfall plots saved for {len(top5)} at-risk students.")
 else:
@@ -576,7 +607,7 @@ for mname, proba in models_eval:
 ax.set_title("Calibration Curves — All Models\n(SYNTHETIC DATA)", style="italic")
 ax.legend(loc="upper left", fontsize=8)
 plt.tight_layout()
-plt.savefig("calibration_curves.png", dpi=150, bbox_inches="tight")
+plt.savefig(os.path.join(RESULTS_DIR, "calibration_curves.png"), dpi=150, bbox_inches="tight")
 plt.show()
 print("✅ Calibration curves saved → calibration_curves.png")
 
@@ -605,7 +636,7 @@ axes[0].set_title("ROC Curves\n(SYNTHETIC DATA)", style="italic")
 axes[1].set_title("Precision-Recall Curves — PRIMARY METRIC\n(SYNTHETIC DATA)",
                    style="italic")
 plt.tight_layout()
-plt.savefig("roc_pr_curves.png", dpi=150, bbox_inches="tight")
+plt.savefig(os.path.join(RESULTS_DIR, "roc_pr_curves.png"), dpi=150, bbox_inches="tight")
 plt.show()
 print("✅ ROC + PR curves saved → roc_pr_curves.png")
 
@@ -779,7 +810,7 @@ for gcol in ["gender", "programme_type"]:
 
 config = f"""# config.yaml
 # XGBoost hyperparameters — NMC-LE failure prediction
-# Author: Miller Prince Bortey | KNUST 2026
+# Author: Prince Bortey Miller | KNUST 2026
 
 model:
   name: XGBoost
@@ -816,9 +847,9 @@ evaluation:
   p_threshold: 0.05
 """
 
-with open("config.yaml", "w") as f:
+with open(os.path.join(RESULTS_DIR, "config.yaml"), "w") as f:
     f.write(config)
-print("✅ config.yaml saved — commit this to GitHub.")
+print("✅ results/config.yaml saved — commit this to GitHub.")
 
 
 # ─────────────────────────────────────────────────────────────

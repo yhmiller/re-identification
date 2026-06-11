@@ -1,0 +1,24 @@
+# ── Data privacy: NEVER commit participant data ──────────────
+data/
+*.xlsx
+*.xls
+anonymised_records.csv
+raw_college_records.*
+
+# ── Environments ─────────────────────────────────────────────
+ml_env/
+venv/
+.env
+
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# ── OS noise ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Local model artefacts (regenerate by running the stages) ─
+*.pkl
+/results
