@@ -1,0 +1,42 @@
+# ============================================================
+# requirements.txt
+# Project: Explainable ML for Predicting Nursing Licensure
+#          Examination Failure in Ghana: An XGBoost-SHAP Approach
+# Author:  Miller Prince Bortey | ID: 22388461 | KNUST
+# ============================================================
+
+# Core ML
+xgboost==2.0.3
+lightgbm==4.1.0
+scikit-learn==1.4.2
+
+# Imbalance handling
+imbalanced-learn==0.12.3
+
+# Explainability
+shap==0.44.1
+
+# Data
+pandas==2.1.4
+numpy==1.26.4
+
+# Synthetic data (pipeline testing only — not used for training/evaluation)
+sdv==1.11.0
+
+# Visualisation
+matplotlib==3.8.4
+seaborn==0.13.2
+
+# Statistics
+scipy==1.13.0
+scikit-learn>=1.4.2   # DeLong test via scipy.stats; McNemar via statsmodels
+statsmodels==0.14.2
+
+# Calibration
+# Built into scikit-learn (CalibrationDisplay, brier_score_loss)
+
+# Reproducibility
+joblib==1.4.2
+
+# Notebook
+ipykernel==6.29.4
