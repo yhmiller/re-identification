@@ -37,3 +37,7 @@ statsmodels==0.14.2
 # Reproducibility / utils
 joblib==1.4.2
 ipykernel==6.29.4
+cloudpickle==2.2.1       # serialises the inference bundle (model + transform)
+
+# Educator screening app (Phase 2)
+streamlit==1.40.2

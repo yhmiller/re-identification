@@ -116,7 +116,8 @@ NUMERIC_COLS = (
 )
 
 # Categorical feature columns
-CATEGORICAL_COLS = ["programme_type", "age_band", "gender", "region"]
+# CATEGORICAL_COLS = ["programme_type", "age_band", "gender", "region"]
+CATEGORICAL_COLS = ["programme_type", "age_band", "gender"]
 
 # All predictor columns
 ALL_FEATURES = NUMERIC_COLS + CATEGORICAL_COLS
@@ -162,11 +163,6 @@ def build_schema_dataframe(n=20):
     df["age_band"]  = rng.choice(["Below 20", "20-24", "25-29", "30+"],
                                   n, p=[0.10, 0.55, 0.25, 0.10])
     df["gender"]    = rng.choice(["Female", "Male"], n, p=[0.72, 0.28])
-    df["region"]    = rng.choice(
-        ["Ashanti", "Greater Accra", "Eastern", "Central",
-         "Western", "Brong-Ahafo", "Northern", "Other"],
-        n, p=[0.22, 0.18, 0.12, 0.10, 0.10, 0.08, 0.10, 0.10]
-    )
     # Target: loosely correlated with CGPA and mock performance.
     # Center the linear predictor on its own mean so the synthetic fail
     # rate lands near 50% (the national NMC-LE first-attempt rate);
@@ -190,7 +186,6 @@ metadata.detect_from_dataframe(schema_df)
 metadata.update_column("programme_type", sdtype="categorical")
 metadata.update_column("age_band",       sdtype="categorical")
 metadata.update_column("gender",         sdtype="categorical")
-metadata.update_column("region",         sdtype="categorical")
 metadata.update_column(TARGET,           sdtype="boolean")
 
 synthesiser = GaussianCopulaSynthesizer(metadata, enforce_rounding=True)
@@ -521,6 +516,25 @@ print_metrics(all_results)
 
 joblib.dump(xgb_clf, os.path.join(RESULTS_DIR, "xgboost_model.pkl"))
 print("\n   Model saved → results/xgboost_model.pkl")
+
+# Self-contained bundle for the educator screening app (Phase 2). cloudpickle
+# captures engineer_features WITH its referenced globals (CA_COLS, etc.), so the
+# app reproduces the exact training-time transform: raw record → engineer →
+# preprocess → predict. Re-running on real data regenerates this automatically.
+import cloudpickle
+INFERENCE_BUNDLE = {
+    "model": xgb_clf,
+    "preprocessor": preprocessor,
+    "engineer_features": engineer_features,
+    "feature_columns": ALL_FEATURES_V2,   # order the preprocessor expects
+    "encoded_feature_names": FEATURE_NAMES,
+    "raw_numeric_columns": NUMERIC_COLS,
+    "categorical_columns": CATEGORICAL_COLS,
+    "target": TARGET,
+}
+with open(os.path.join(RESULTS_DIR, "inference_bundle.pkl"), "wb") as f:
+    cloudpickle.dump(INFERENCE_BUNDLE, f)
+print("   Inference bundle saved → results/inference_bundle.pkl")
 
 
 # ─────────────────────────────────────────────────────────────

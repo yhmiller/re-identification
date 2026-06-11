@@ -1,0 +1,6 @@
+student_id,wassce_aggregate,programme_cgpa,ca_medical_surgical,ca_mental_health,ca_paediatric,ca_public_health,ca_obstetric,ca_pharmacology,mock_medical_surgical,mock_mental_health,mock_paediatric,mock_public_health,mock_obstetric,mock_pharmacology,programme_type,age_band,gender
+S001,12,3.6,78,80,76,82,79,77,80,82,78,84,81,79,RGN,20-24,Female
+S002,28,2.1,45,42,48,40,44,46,38,35,41,37,39,43,RM,25-29,Male
+S003,20,2.8,60,62,58,64,61,59,55,57,53,59,56,54,NAC,20-24,Female
+S004,16,3.1,70,68,72,66,71,69,65,67,63,69,66,64,RGN,Below 20,Female
+S005,30,1.9,40,38,42,36,41,39,33,31,35,37,34,32,NAP,30+,Male

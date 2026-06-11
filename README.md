@@ -22,7 +22,7 @@ Code pipeline for the MSc Health Informatics thesis:
 Ghana's NMC Licensure Examination has a national first-attempt pass rate of ~50%. This study builds an explainable ML model (**XGBoost + SHAP**) to predict which nursing trainees are at risk of failing, using routinely collected academic records — enabling targeted remediation before the examination. The engineering contribution is **E-XGBoost**: SHAP-guided feature pruning compared against the locked baseline on identical splits (Wilcoxon signed-rank).
 
 **Target:** Fail = 1 (failed ≥1 of 6 theory papers, first attempt) | Pass = 0
-**Predictors (pre-exam only):** WASSCE entry grades, continuous assessment, programme CGPA, mock scores, programme type, age band, gender, region
+**Predictors (pre-exam only):** WASSCE entry grades, continuous assessment, programme CGPA, mock scores, programme type, age band, gender
 **Theory:** Astin's Input–Environment–Output (I-E-O) model
 
 ---
@@ -38,17 +38,24 @@ xgboost-shap-nursing-licensure/
 │
 ├── run.sh                                 # one command: set up env + run everything
 ├── run_all.py                             # runs Stage 1 + Stage 2 in one process
+├── app.sh                                 # one command: launch the educator app
 │
 ├── notebooks/
 │   ├── 00_data_preparation_and_eda.py     # Stage 0: clean → anonymise → EDA
 │   ├── 01_pipeline_and_experiments.py     # Stage 1: baselines + XGBoost + SHAP + eval
 │   └── 02_model_engineering.py            # Stage 2: E-XGBoost vs baseline
 │
+├── app/                                   # educator risk-screening web app
+│   ├── app.py                             # Streamlit UI
+│   ├── inference.py                       # load model bundle + score records
+│   └── example_students.csv              # sample upload to try the app
+│
 ├── results/                               # all auto-generated when stages run
 │   ├── eda_*.csv / eda_*.png
 │   ├── shap_*.png, roc_pr_curves.png, calibration_curves.png
 │   ├── baseline_metrics.json, engineered_metrics.json
 │   ├── comparison_table.csv               # Table 1 of the Results chapter
+│   ├── inference_bundle.pkl               # model + preprocessor + transform (for the app)
 │   └── config.yaml                        # hyperparameters — written by Stage 1, Cell 19
 │
 ├── .gitignore
@@ -80,6 +87,24 @@ setup step is skipped once the environment exists.
 
 For interactive exploration, each `.py` file is also organised into numbered
 cells (`# CELL N` / `# ENG-CELL N`) to paste into Jupyter/Colab.
+
+## Educator screening app
+
+For nurse educators (no coding needed) — screen a class and see who is at risk:
+
+```bash
+./run.sh     # once, to train the model
+./app.sh     # launch the app in your browser
+```
+
+Upload a spreadsheet of student records (download the blank template from the
+app, or try `app/example_students.csv`). The app returns a ranked at-risk list
+and, for any student, the top factors behind their risk estimate. It loads
+`results/inference_bundle.pkl`, so re-running `./run.sh` on real data updates the
+app automatically — no app changes needed.
+
+> Predictions are decision support, not verdicts. The current model is trained on
+> synthetic data; results are illustrative until trained on real records.
 
 ---
 

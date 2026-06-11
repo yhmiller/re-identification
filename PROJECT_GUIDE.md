@@ -16,10 +16,19 @@ xgboost-shap-nursing-licensure/
 │   ├── raw_college_records.xlsx      ← the file the college gives you (NEVER commit/share)
 │   └── anonymised_records.csv        ← output of Stage 0 (safe to keep in Drive)
 │
-├── notebooks/                        ← run these in order
+├── run.sh                            ← ONE command: set up + run the whole analysis
+├── run_all.py                        ← runs Stage 1 + Stage 2 in a single process
+├── app.sh                            ← ONE command: launch the educator screening app
+│
+├── notebooks/                        ← the stages (also runnable cell-by-cell in Colab)
 │   ├── 00_data_preparation_and_eda.py    Stage 0: clean → exclude → anonymise → EDA
 │   ├── 01_pipeline_and_experiments.py    Stage 1: baselines + XGBoost + SHAP + eval (20 cells)
 │   └── 02_model_engineering.py           Stage 2: E-XGBoost vs baseline (10 ENG-cells)
+│
+├── app/                              ← educator risk-screening web app
+│   ├── app.py                            Streamlit UI (upload → at-risk list → SHAP why)
+│   ├── inference.py                      loads the model bundle, scores records
+│   └── example_students.csv             sample upload to try the app
 │
 ├── results/                          ← everything below is auto-generated
 │   ├── eda_descriptives.csv,  eda_missingness.csv
@@ -29,16 +38,47 @@ xgboost-shap-nursing-licensure/
 │   ├── calibration_curves.png, roc_pr_curves.png
 │   ├── baseline_metrics.json, engineered_metrics.json
 │   ├── comparison_table.csv          ← TABLE 1 of your Results chapter
+│   ├── inference_bundle.pkl          ← model + preprocessor + transform (feeds the app)
 │   └── config.yaml
 │
 ├── requirements.txt
 └── README.md
 ```
 
-Setup once (Mac terminal):
+---
+
+## How to run
+
+**Prerequisite (once):** Python 3.11 must be installed — the pinned libraries
+(`sdv==1.11.0` especially) do not support 3.12+. On macOS:
+```bash
+brew install python@3.11
+```
+
+**Run the whole analysis — one command:**
+```bash
+./run.sh
+```
+On first use this builds the `ml_env` virtual environment and installs
+dependencies, then runs Stage 1 + Stage 2 end-to-end. Every figure, table and
+metric appears in `results/`. Re-running is safe; setup is skipped once it exists.
+
+**Launch the educator screening app:**
+```bash
+./app.sh
+```
+Opens in your browser. Upload a spreadsheet of student records (download the
+blank template from the app, or try `app/example_students.csv`) to get a ranked
+at-risk list and a per-student SHAP explanation. Run `./run.sh` at least once
+first so the model bundle exists.
+
+**Manual / Colab path:** each notebook is also organised into numbered cells
+(`# CELL N` / `# ENG-CELL N`) you can paste into Jupyter/Colab. Locally, the
+equivalent of `./run.sh` is:
 ```bash
 python -m venv ml_env && source ml_env/bin/activate
 pip install -r requirements.txt
+python run_all.py
 ```
 
 ---
@@ -51,16 +91,17 @@ pip install -r requirements.txt
 | **1** | `01_pipeline_and_experiments.py` | Schema, preprocessing, splits, 3 baselines, XGBoost, SHAP, calibration, DeLong, McNemar, fairness | Now (synthetic) → re-run on real data |
 | **2** | `02_model_engineering.py` | Lock baseline → SHAP-guided pruning → **E-XGBoost** → Wilcoxon comparison table | After Stage 1 on real data |
 
-**Today (before real data):** run Stage 1 cells 1–20 on synthetic data, then Stage 2. Everything should complete green. That proves the machinery works.
+**Today (before real data):** run `./run.sh` — it runs Stage 1 + Stage 2 on
+synthetic data and writes everything to `results/`. Everything should complete
+green. That proves the machinery works.
 
 **When real data arrives (the only changes you make):**
 1. Put the college's file at `data/raw_college_records.xlsx`
 2. Open Stage 0, PREP-CELL 2: fix `COLUMN_MAPPING` to match their actual column headers, set `TARGET_RULE`
 3. Run Stage 0 → produces `anonymised_records.csv` + your exclusion-flow table
 4. Open Stage 1, Cell 6: uncomment `REAL_DATA_PATH = "data/anonymised_records.csv"`, comment out `syn_df`
-5. Re-run Stage 1 from Cell 6 → all real results
-6. Run Stage 2 → E-XGBoost vs baseline on real data
-7. Done — every figure and table for the thesis is in `results/`
+5. Run `./run.sh` again → all real results in `results/` (and the educator app now serves the real model)
+6. Done — every figure and table for the thesis is in `results/`
 
 ---
 
@@ -107,6 +148,7 @@ pip install -r requirements.txt
 - [x] Stage 0 built and live-tested on a messy mock college file (528 raw → 488 clean, 0 identifier leaks)
 - [x] Stage 1 built, syntax-valid, 20 cells
 - [x] Stage 2 built and live-tested end-to-end (Wilcoxon table generates)
-- [ ] Run full chain on your Mac (synthetic) — your next action
+- [x] Full chain runs on Mac via `./run.sh` (synthetic) — all 17 `results/` artefacts generate green
+- [x] Educator screening app built (`./app.sh`) and verified on the synthetic model
 - [ ] Await HuSSREC reference number
-- [ ] Real data from college → re-run chain → results final
+- [ ] Real data from college → re-run `./run.sh` → results final → app serves real model
