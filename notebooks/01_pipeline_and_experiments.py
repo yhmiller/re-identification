@@ -475,22 +475,48 @@ print("\n   Models saved.")
 
 
 # ─────────────────────────────────────────────────────────────
-# CELL 11 — XGBoost model
-# Uses early stopping on validation AUC-PR.
+# CELL 10.5 — Hyperparameter grid search (XGBoost)
+# Tune the core hyperparameters by 5-fold CV on the training split,
+# scoring AUC-PR (the primary metric). The winners feed CELL 11.
 # ─────────────────────────────────────────────────────────────
+from sklearn.model_selection import GridSearchCV
 
-# Estimated class weight (update with real data prevalence)
+# Estimated class weight (updates automatically with real-data prevalence)
 neg = int((y_train == 0).sum())
 pos = int((y_train == 1).sum())
 spw = round(neg / pos, 2) if pos > 0 else 1
 print(f"ℹ️  scale_pos_weight = {spw} (neg/pos = {neg}/{pos})")
 
+XGB_PARAM_GRID = {
+    "max_depth":        [3, 6],
+    "learning_rate":    [0.05, 0.10],
+    "n_estimators":     [300, 500],
+    "subsample":        [0.8],
+    "colsample_bytree": [0.8],
+}
+grid = GridSearchCV(
+    xgb.XGBClassifier(scale_pos_weight=spw, eval_metric="aucpr",
+                      random_state=SEED, verbosity=0, use_label_encoder=False),
+    XGB_PARAM_GRID,
+    scoring="average_precision",   # AUC-PR
+    cv=StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED),
+    n_jobs=1,
+)
+grid.fit(X_train_proc, y_train)
+best_xgb_params = grid.best_params_
+print("✅ Grid search complete.")
+print(f"   Best params   : {best_xgb_params}")
+print(f"   Best CV AUC-PR: {grid.best_score_:.4f}")
+
+
+# ─────────────────────────────────────────────────────────────
+# CELL 11 — XGBoost model
+# Final model uses the grid-search winners + early stopping on
+# validation AUC-PR.
+# ─────────────────────────────────────────────────────────────
+
 xgb_clf = xgb.XGBClassifier(
-    n_estimators      = 500,
-    max_depth         = 6,
-    learning_rate     = 0.05,
-    subsample         = 0.8,
-    colsample_bytree  = 0.8,
+    **best_xgb_params,
     scale_pos_weight  = spw,
     eval_metric       = "aucpr",
     early_stopping_rounds = 50,
@@ -538,6 +564,32 @@ print("   Inference bundle saved → results/inference_bundle.pkl")
 
 
 # ─────────────────────────────────────────────────────────────
+# CELL 11.5 — Repeated-seed variance
+# Retrain the tuned model under 10 random seeds and report the spread
+# of test metrics — confirms results are not a single-seed fluke.
+# ─────────────────────────────────────────────────────────────
+SEED_RUNS = 10
+seed_rows = []
+for s in range(SEED_RUNS):
+    m = xgb.XGBClassifier(**best_xgb_params, scale_pos_weight=spw,
+                          eval_metric="aucpr", random_state=s,
+                          verbosity=0, use_label_encoder=False)
+    m.fit(X_train_proc, y_train)
+    p = m.predict_proba(X_test_proc)[:, 1]
+    seed_rows.append({
+        "seed": s,
+        "auc_roc": round(roc_auc_score(y_test, p), 4),
+        "auc_pr":  round(average_precision_score(y_test, p), 4),
+    })
+seed_var_df = pd.DataFrame(seed_rows)
+seed_var_df.to_csv(os.path.join(RESULTS_DIR, "seed_variance.csv"), index=False)
+print(f"✅ Repeated-seed variance ({SEED_RUNS} runs):")
+print(f"   AUC-ROC: {seed_var_df['auc_roc'].mean():.4f} ± {seed_var_df['auc_roc'].std():.4f}")
+print(f"   AUC-PR : {seed_var_df['auc_pr'].mean():.4f} ± {seed_var_df['auc_pr'].std():.4f}")
+print("   Saved → results/seed_variance.csv")
+
+
+# ─────────────────────────────────────────────────────────────
 # CELL 12 — SHAP: global feature importance (beeswarm plot)
 # Uses TreeExplainer — exact Shapley values for XGBoost.
 # ─────────────────────────────────────────────────────────────
@@ -569,6 +621,26 @@ plt.tight_layout()
 plt.savefig(os.path.join(RESULTS_DIR, "shap_beeswarm.png"), dpi=150, bbox_inches="tight")
 plt.show()
 print("   Plot saved → shap_beeswarm.png")
+
+
+# ─────────────────────────────────────────────────────────────
+# CELL 12.5 — SHAP dependence plots (top-3 predictors)
+# How each top predictor's value relates to its SHAP impact on risk.
+# ─────────────────────────────────────────────────────────────
+import re
+top3_features = global_importance.head(3).index.tolist()
+for feat in top3_features:
+    plt.figure()
+    shap.dependence_plot(feat, shap_values, X_test_proc,
+                         feature_names=FEATURE_NAMES, show=False)
+    plt.title(f"SHAP dependence — {feat}\n(SYNTHETIC DATA)",
+              fontsize=10, style="italic")
+    plt.tight_layout()
+    safe = re.sub(r"[^0-9a-zA-Z]+", "_", feat).strip("_")
+    plt.savefig(os.path.join(RESULTS_DIR, f"shap_dependence_{safe}.png"),
+                dpi=150, bbox_inches="tight")
+    plt.close()
+print(f"✅ SHAP dependence plots (top-3): {top3_features}")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -819,6 +891,63 @@ for gcol in ["gender", "programme_type"]:
 
 
 # ─────────────────────────────────────────────────────────────
+# CELL 18.5 — Ablation study (feature-group contribution)
+# Retrain the tuned model on reduced feature sets to show each group's
+# contribution. 5-fold CV AUC-PR; preprocessing refitted inside each fold.
+# ─────────────────────────────────────────────────────────────
+def ablation_auc_pr(feature_subset):
+    """5-fold CV mean/std AUC-PR for one feature subset (no leakage)."""
+    num_sub = [c for c in feature_subset if c in ALL_NUMERIC]
+    cat_sub = [c for c in feature_subset if c in CATEGORICAL_COLS]
+    transformers = []
+    if num_sub:
+        transformers.append(("num", Pipeline([
+            ("imp", SimpleImputer(strategy="median")),
+            ("sc",  MinMaxScaler())]), num_sub))
+    if cat_sub:
+        transformers.append(("cat", Pipeline([
+            ("imp", SimpleImputer(strategy="most_frequent")),
+            ("oh",  OneHotEncoder(handle_unknown="ignore", sparse_output=False))]),
+            cat_sub))
+    pre = ColumnTransformer(transformers, remainder="drop")
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED)
+    Xsub = X[feature_subset]
+    scores = []
+    for tr_idx, te_idx in skf.split(Xsub, y):
+        Xtr = pre.fit_transform(Xsub.iloc[tr_idx])
+        Xte = pre.transform(Xsub.iloc[te_idx])
+        m = xgb.XGBClassifier(**best_xgb_params, scale_pos_weight=spw,
+                              eval_metric="aucpr", random_state=SEED,
+                              verbosity=0, use_label_encoder=False)
+        m.fit(Xtr, y.iloc[tr_idx])
+        scores.append(average_precision_score(
+            y.iloc[te_idx], m.predict_proba(Xte)[:, 1]))
+    return float(np.mean(scores)), float(np.std(scores))
+
+ABLATION_VARIANTS = {
+    "All features":           ALL_FEATURES_V2,
+    "CGPA only":              ["programme_cgpa"],
+    "No mock scores":         [f for f in ALL_FEATURES_V2 if "mock" not in f],
+    "No entry qualification": [f for f in ALL_FEATURES_V2
+                               if f not in ("wassce_aggregate", "wassce_band")],
+}
+ablation_rows = []
+for name, feats in ABLATION_VARIANTS.items():
+    mean_pr, std_pr = ablation_auc_pr(feats)
+    ablation_rows.append({
+        "variant": name,
+        "n_features": len(feats),
+        "auc_pr_mean": round(mean_pr, 4),
+        "auc_pr_std": round(std_pr, 4),
+    })
+ablation_df = pd.DataFrame(ablation_rows)
+ablation_df.to_csv(os.path.join(RESULTS_DIR, "ablation_table.csv"), index=False)
+print("✅ Ablation study (5-fold CV AUC-PR):")
+print(ablation_df.to_string(index=False))
+print("   Saved → results/ablation_table.csv")
+
+
+# ─────────────────────────────────────────────────────────────
 # CELL 19 — Save config.yaml (all hyperparameters for GitHub)
 # ─────────────────────────────────────────────────────────────
 
@@ -828,11 +957,12 @@ config = f"""# config.yaml
 
 model:
   name: XGBoost
-  n_estimators: 500
-  max_depth: 6
-  learning_rate: 0.05
-  subsample: 0.8
-  colsample_bytree: 0.8
+  tuning: GridSearchCV (5-fold, scoring=AUC-PR)
+  n_estimators: {best_xgb_params.get("n_estimators")}
+  max_depth: {best_xgb_params.get("max_depth")}
+  learning_rate: {best_xgb_params.get("learning_rate")}
+  subsample: {best_xgb_params.get("subsample")}
+  colsample_bytree: {best_xgb_params.get("colsample_bytree")}
   scale_pos_weight: {spw}
   early_stopping_rounds: 50
   eval_metric: aucpr
@@ -886,13 +1016,17 @@ checks = [
     ("Temporal split (if cohort_year exists)",
      "cohort_year" in raw_df.columns),
     ("Baseline models trained + evaluated",      True),
+    ("Hyperparameter grid search (AUC-PR)",      True),
     ("XGBoost trained + evaluated",              True),
+    ("Repeated-seed variance (10 runs)",         True),
     ("SHAP computed (global + per-student)",     True),
+    ("SHAP dependence plots (top-3)",            True),
     ("Calibration (Brier + curves)",             True),
     ("ROC + PR curves",                          True),
     ("DeLong test for AUC comparison",           True),
     ("McNemar test for label disagreement",      True),
     ("Fairness (FNR/FPR/EOD) computed",          True),
+    ("Ablation study (feature groups)",          True),
     ("config.yaml saved",                        True),
 ]
 

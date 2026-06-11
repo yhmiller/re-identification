@@ -44,6 +44,14 @@ np.random.seed(SEED)
 RESULTS_DIR = globals().get("RESULTS_DIR", "results")
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
+# Use the SAME grid-search-tuned hyperparameters as Stage 1 so the engineering
+# comparison is baseline-tuned vs pruned-tuned (only the feature set changes).
+# Falls back to the documented defaults when run standalone without Stage 1.
+XGB_PARAMS = globals().get("best_xgb_params", {
+    "n_estimators": 500, "max_depth": 6, "learning_rate": 0.05,
+    "subsample": 0.8, "colsample_bytree": 0.8,
+})
+
 # We use the FULL feature matrix and target from the main pipeline.
 # X = raw_df[ALL_FEATURES_V2]   (already defined in 01_..., Cell 7)
 # y = raw_df[TARGET]
@@ -98,8 +106,7 @@ def run_cv(feature_subset, label):
         Xte_p = pre.transform(Xte)
 
         model = xgb.XGBClassifier(
-            n_estimators=500, max_depth=6, learning_rate=0.05,
-            subsample=0.8, colsample_bytree=0.8,
+            **XGB_PARAMS,
             eval_metric="logloss", random_state=SEED, verbosity=0,
         )
         t0 = time.time()
@@ -148,8 +155,7 @@ print(f"✅ Baseline LOCKED → results/baseline_metrics.json ({len(ALL_FEATURE_
 # Fit a model on the full preprocessed data to get SHAP rankings
 X_full_proc = preprocessor.fit_transform(X)     # preprocessor from Cell 8
 rank_model = xgb.XGBClassifier(
-    n_estimators=500, max_depth=6, learning_rate=0.05,
-    subsample=0.8, colsample_bytree=0.8,
+    **XGB_PARAMS,
     eval_metric="logloss", random_state=SEED, verbosity=0,
 )
 rank_model.fit(X_full_proc, y)

@@ -52,11 +52,14 @@ xgboost-shap-nursing-licensure/
 │
 ├── results/                               # all auto-generated when stages run
 │   ├── eda_*.csv / eda_*.png
-│   ├── shap_*.png, roc_pr_curves.png, calibration_curves.png
+│   ├── shap_beeswarm.png, shap_waterfall_student*.png, shap_dependence_*.png
+│   ├── roc_pr_curves.png, calibration_curves.png
 │   ├── baseline_metrics.json, engineered_metrics.json
+│   ├── seed_variance.csv                   # 10-seed metric spread
+│   ├── ablation_table.csv                  # feature-group ablation (AUC-PR)
 │   ├── comparison_table.csv               # Table 1 of the Results chapter
 │   ├── inference_bundle.pkl               # model + preprocessor + transform (for the app)
-│   └── config.yaml                        # hyperparameters — written by Stage 1, Cell 19
+│   └── config.yaml                        # grid-search-tuned hyperparameters
 │
 ├── .gitignore
 ├── requirements.txt
