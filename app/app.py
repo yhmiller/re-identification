@@ -23,7 +23,7 @@ PROB_PERCENT_FORMAT = "{:.0%}"
 # ── Project / authorship metadata (shown in the About modal + bylines) ──
 APP_TITLE = "NMC-LE Risk Screening"
 RESEARCHER = "Prince Bortey Miller"
-RESEARCHER_ID = "22388461"
+# RESEARCHER_ID = "22388461"
 RESEARCHER_EMAIL = "prince@princemiller.com"
 RESEARCHER_SITE = "https://www.princemiller.com"
 SUPERVISOR = "Dr. Eric Opoku Osei"
@@ -389,8 +389,10 @@ def render_model_insight():
 def render_footer():
     st.divider()
     st.caption(
-        f"**{APP_TITLE}** · {RESEARCHER} (ID {RESEARCHER_ID}) · "
-        f"Supervisor: {SUPERVISOR} · {INSTITUTION}, {PROGRAMME} · "
+        # f"**{APP_TITLE}** · {RESEARCHER} (ID {RESEARCHER_ID}) · "
+        f"**{APP_TITLE}** · {RESEARCHER} · "
+        f"Supervisor: {SUPERVISOR} \n "
+        f"{INSTITUTION}, {PROGRAMME} · "
         f"[www.princemiller.com]({RESEARCHER_SITE}) · "
         f"[{RESEARCHER_EMAIL}](mailto:{RESEARCHER_EMAIL})"
     )
