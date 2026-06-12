@@ -6,6 +6,7 @@ per-student explanation of why the model flagged them.
 
 Launch:  ml_env/bin/streamlit run app/app.py
 """
+import glob
 import sys
 from pathlib import Path
 
@@ -36,7 +37,8 @@ Licensure Examination (NMC-LE)** failure in Ghana — an **XGBoost + SHAP**
 approach. It screens nursing trainees for first-attempt failure risk so
 educators can target remediation early. Decision support only — not a verdict.
 
-**Researcher:** {RESEARCHER} (ID {RESEARCHER_ID})
+**Researcher:** {RESEARCHER}
+
 [{RESEARCHER_EMAIL}](mailto:{RESEARCHER_EMAIL}) · [www.princemiller.com]({RESEARCHER_SITE})
 
 **Supervisor:** {SUPERVISOR}
@@ -84,7 +86,7 @@ def render_data_warning(bundle):
     """Show an illustrative-only banner until the model is trained on real data."""
     if bundle.get("data_source", "synthetic") != "real":
         st.warning(
-            "oen**Demonstration mode** — this model is trained on **synthetic "
+            "**Demonstration mode** — this model is trained on **synthetic "
             "pilot data**. The risk scores are illustrative only and must not be "
             "used for real student decisions. The banner disappears automatically "
             "once the model is retrained on the real college dataset.",
@@ -255,6 +257,135 @@ def render_explanation(scored, bundle):
         st.bar_chart(contributions.set_index("label")["shap_value"])
 
 
+RESULTS_DIR = inference.REPO_ROOT / "results"
+
+# ── Model-insight side drawer ──
+INSIGHT_STATE_KEY = "show_model_insight"
+INSIGHT_DRAWER_KEY = "model-insight-drawer"  # → DOM class `st-key-model-insight-drawer`
+DRAWER_WIDTH_PX = 820
+
+# Position the keyed container as a fixed right-side panel and dim the page behind
+# it. The drawer holds native Streamlit widgets (st.image, st.caption), so it is a
+# real container styled by its key — not raw HTML with base64 images.
+DRAWER_CSS = f"""
+    <style>
+    .insight-overlay {{
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.45);
+        z-index: 9998;
+        animation: insightFade .2s ease-out;
+    }}
+    .st-key-{INSIGHT_DRAWER_KEY} {{
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: {DRAWER_WIDTH_PX}px;
+        max-width: 92vw;
+        height: 100vh;
+        background: #ffffff;
+        color: #0f172a;
+        box-shadow: -8px 0 28px rgba(15, 23, 42, .18);
+        z-index: 9999;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 4rem 1.75rem 3rem;
+        animation: insightSlideIn .28s cubic-bezier(.16, 1, .3, 1);
+    }}
+    /* Keep wide figures inside the drawer. Inside a fixed panel, use_container_width
+       mis-measures and the image blocks become flex items with min-width:auto, so
+       they refuse to shrink below the image's intrinsic width and overflow. Reset
+       min-width and cap every wrapper (and the <img>) to the drawer width. */
+    .st-key-{INSIGHT_DRAWER_KEY} [data-testid="stElementContainer"],
+    .st-key-{INSIGHT_DRAWER_KEY} [data-testid="stFullScreenFrame"],
+    .st-key-{INSIGHT_DRAWER_KEY} [data-testid="stImageContainer"],
+    .st-key-{INSIGHT_DRAWER_KEY} [data-testid="stImage"] {{
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }}
+    .st-key-{INSIGHT_DRAWER_KEY} [data-testid="stImage"] img {{
+        width: 100% !important;
+        height: auto;
+    }}
+    @keyframes insightSlideIn {{
+        from {{ transform: translateX(100%); }}
+        to {{ transform: translateX(0); }}
+    }}
+    @keyframes insightFade {{
+        from {{ opacity: 0; }}
+        to {{ opacity: 1; }}
+    }}
+    </style>
+"""
+
+# Cohort-wide figures (produced by Stage 1) with plain-English captions, mirroring
+# the "Seeing the model think" section of the project portfolio.
+MODEL_FIGURES = [
+    ("shap_beeswarm.png", "What drives risk across the whole cohort",
+     "Each dot is one student. Features are ranked by how much they sway the "
+     "prediction — academic signals like mock scores and CGPA outweigh "
+     "demographic ones."),
+    ("roc_pr_curves.png", "How well it tells pass from fail",
+     "ROC and precision–recall curves, XGBoost against every baseline. AUC-PR is "
+     "the headline metric — it stays honest on the imbalanced failure class."),
+    ("calibration_curves.png", "Can you trust the percentages?",
+     "A 70% risk score should mean roughly 70% of such students actually fail. "
+     "The calibration curve and Brier score check the probabilities are meaningful."),
+]
+
+
+def open_model_insight():
+    st.session_state[INSIGHT_STATE_KEY] = True
+
+
+def close_model_insight():
+    st.session_state[INSIGHT_STATE_KEY] = False
+
+
+def _render_insight_body():
+    """Cohort-wide figures mirroring the portfolio's 'Seeing the model think' section."""
+    st.caption("Cohort-wide views of the model behind the scores above. These are "
+               "illustrative - generated on the current synthetic model.")
+
+    for fname, title, desc in MODEL_FIGURES:
+        path = RESULTS_DIR / fname
+        if path.exists():
+            st.markdown(f"**{title}**")
+            st.caption(desc)
+            st.image(str(path), use_container_width=True)
+
+    dependence = sorted(glob.glob(str(RESULTS_DIR / "shap_dependence_*.png")))
+    if dependence:
+        st.markdown("**How a top factor shapes risk**")
+        st.caption("Dependence plots show the shape of a relationship — for "
+                   "example, how falling mock scores push failure risk upward.")
+        for path in dependence:
+            st.image(path, use_container_width=True)
+
+    st.caption("The per-student breakdown above ('Why was a student flagged?') "
+               "is the same model, zoomed in to a single trainee.")
+
+
+def render_model_insight():
+    """A right-side drawer mirroring the portfolio's 'Seeing the model think' section."""
+    st.session_state.setdefault(INSIGHT_STATE_KEY, False)
+
+    st.button("🧠 Seeing the model think — how it reaches these scores",
+              on_click=open_model_insight)
+
+    if not st.session_state[INSIGHT_STATE_KEY]:
+        return
+
+    st.markdown(DRAWER_CSS, unsafe_allow_html=True)
+    st.markdown('<div class="insight-overlay"></div>', unsafe_allow_html=True)
+
+    with st.container(key=INSIGHT_DRAWER_KEY):
+        st.markdown("### 🧠 Seeing the model think")
+        st.button("✕ Close", on_click=close_model_insight, key="close_insight_drawer")
+        _render_insight_body()
+
+
 def render_footer():
     st.divider()
     st.caption(
@@ -295,7 +426,7 @@ def main():
             render_results_table(scored, bundle)
             render_explanation(scored, bundle)
 
-    # footer with the byline
+    render_model_insight()
     render_footer()
 
 
