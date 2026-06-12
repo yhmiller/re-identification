@@ -158,13 +158,52 @@ def render_results_table(scored, bundle):
 
 
 def _strength_word(value, max_abs):
-    """Qualitative size of a factor relative to the strongest one shown."""
+    """How much a factor weighs, relative to the strongest one shown."""
     ratio = abs(value) / max_abs if max_abs else 0
     if ratio >= 0.66:
-        return "strong"
+        return "major factor"
     if ratio >= 0.33:
-        return "moderate"
-    return "slight"
+        return "moderate factor"
+    return "minor factor"
+
+
+def _join_factors(frame, limit=2):
+    """A readable 'A and B' phrase from the top factor labels (case preserved
+    so domain acronyms like CA / CGPA / WASSCE stay intact)."""
+    items = frame["label"].head(limit).tolist()
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    return f"{', '.join(items[:-1])} and {items[-1]}"
+
+
+def _natural_summary(chosen, prob, at_risk, raises, lowers):
+    """A plain-language sentence a tutor could read aloud."""
+    pct = PROB_PERCENT_FORMAT.format(prob)
+    top_raise = _join_factors(raises)
+    top_lower = lowers["label"].iloc[0] if not lowers.empty else None
+
+    if at_risk:
+        text = (
+            f"Mainly because of **{top_raise or 'this student’s overall profile'}**, "
+            f"the model predicts **{chosen} is likely to fail** at least one of the "
+            f"six papers at the first sitting — about a **{pct}** chance."
+        )
+        if top_lower:
+            text += (f" Their **{top_lower}** counts in their favour, but not enough "
+                     f"to offset the risk.")
+        text += f" Consider prioritising {chosen} for early remediation."
+    else:
+        text = (
+            f"**{chosen}**’s overall profile"
+            + (f", helped by **{top_lower}**," if top_lower else "")
+            + f" keeps the estimated first-sitting failure risk **low at {pct}**, so the "
+              f"model does **not** flag them."
+        )
+        if top_raise:
+            text += f" If anything could push the risk up, watch **{top_raise}**."
+    return text
 
 
 def render_explanation(scored, bundle):
@@ -174,10 +213,11 @@ def render_explanation(scored, bundle):
 
     row = scored[scored[inference.STUDENT_ID_COLUMN] == chosen]
     prob = float(row[inference.RISK_PROB_COLUMN].iloc[0])
-    flagged = "at risk" if bool(row["at_risk"].iloc[0]) else "not at risk"
+    at_risk = bool(row["at_risk"].iloc[0])
     st.markdown(
-        f"**{chosen}** has an estimated **{PROB_PERCENT_FORMAT.format(prob)}** "
-        f"chance of failing — currently **{flagged}**. The factors behind this:"
+        f"**{chosen}** has an estimated **{PROB_PERCENT_FORMAT.format(prob)}** chance of "
+        f"failing — currently **{'at risk' if at_risk else 'not at risk'}**. "
+        "The factors behind this:"
     )
 
     raw_row = row[inference.required_raw_columns(bundle)]
@@ -204,8 +244,13 @@ def render_explanation(scored, bundle):
         for _, r in lowers.iterrows():
             st.markdown(f"- {r['label']} — *{_strength_word(r['shap_value'], max_abs)}*")
 
+    st.info(_natural_summary(chosen, prob, at_risk, raises, lowers), icon="🩺")
+    st.caption("A *major factor* weighs heavily in this estimate; a *minor factor* "
+               "nudges it only slightly. These are the model's reasons, not a verdict — "
+               "always combine with your own knowledge of the student.")
+
     with st.expander("See the contribution chart"):
-        st.caption("SHAP values - how much each input pushed this student's risk "
+        st.caption("SHAP values — how much each input pushed this student's risk "
                    "up (positive) or down (negative) versus the average student.")
         st.bar_chart(contributions.set_index("label")["shap_value"])
 
