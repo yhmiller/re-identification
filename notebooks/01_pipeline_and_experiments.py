@@ -163,6 +163,16 @@ def build_schema_dataframe(n=20):
     df["age_band"]  = rng.choice(["Below 20", "20-24", "25-29", "30+"],
                                   n, p=[0.10, 0.55, 0.25, 0.10])
     df["gender"]    = rng.choice(["Female", "Male"], n, p=[0.72, 0.28])
+
+    # Context columns — NOT model predictors. region drives fairness
+    # disaggregation; cohort_year drives the temporal split. Both are collected
+    # on the College Data Extraction Form (Questionnaire 3).
+    df["region"] = rng.choice(
+        ["Ashanti", "Greater Accra", "Eastern", "Central",
+         "Western", "Brong-Ahafo", "Northern", "Other"],
+        n, p=[0.22, 0.18, 0.12, 0.10, 0.10, 0.08, 0.10, 0.10])
+    df["cohort_year"] = rng.choice([2021, 2022, 2023, 2024], n)
+
     # Target: loosely correlated with CGPA and mock performance.
     # Center the linear predictor on its own mean so the synthetic fail
     # rate lands near 50% (the national NMC-LE first-attempt rate);
@@ -186,6 +196,8 @@ metadata.detect_from_dataframe(schema_df)
 metadata.update_column("programme_type", sdtype="categorical")
 metadata.update_column("age_band",       sdtype="categorical")
 metadata.update_column("gender",         sdtype="categorical")
+metadata.update_column("region",         sdtype="categorical")
+metadata.update_column("cohort_year",    sdtype="categorical")   # discrete years
 metadata.update_column(TARGET,           sdtype="boolean")
 
 synthesiser = GaussianCopulaSynthesizer(metadata, enforce_rounding=True)
@@ -194,6 +206,7 @@ synthesiser.fit(schema_df)
 # Generate 1,000 synthetic rows
 syn_df = synthesiser.sample(num_rows=1000)
 syn_df[TARGET] = syn_df[TARGET].astype(int)
+syn_df["cohort_year"] = syn_df["cohort_year"].astype(int)   # years for temporal split
 
 print("✅ Synthetic data generated.")
 print(f"   Shape  : {syn_df.shape}")
@@ -297,9 +310,11 @@ except ModuleNotFoundError:
 # REAL_DATA_PATH = "/content/drive/MyDrive/nursing_data/anonymised_records.csv"
 # raw_df = pd.read_csv(REAL_DATA_PATH)
 # raw_df = engineer_features(raw_df)
+# DATA_SOURCE = "real"
 
 # ── Option B: Use synthetic pilot data (default for now) ────────
 raw_df = syn_df.copy()
+DATA_SOURCE = "synthetic"   # flips the app's illustrative-only banner; set to "real" above
 print("ℹ️  Using SYNTHETIC data (pipeline testing mode).")
 
 # ── Validate required columns ───────────────────────────────────
@@ -557,6 +572,7 @@ INFERENCE_BUNDLE = {
     "raw_numeric_columns": NUMERIC_COLS,
     "categorical_columns": CATEGORICAL_COLS,
     "target": TARGET,
+    "data_source": DATA_SOURCE,   # "synthetic" or "real" — drives the app banner
 }
 with open(os.path.join(RESULTS_DIR, "inference_bundle.pkl"), "wb") as f:
     cloudpickle.dump(INFERENCE_BUNDLE, f)
@@ -587,6 +603,37 @@ print(f"✅ Repeated-seed variance ({SEED_RUNS} runs):")
 print(f"   AUC-ROC: {seed_var_df['auc_roc'].mean():.4f} ± {seed_var_df['auc_roc'].std():.4f}")
 print(f"   AUC-PR : {seed_var_df['auc_pr'].mean():.4f} ± {seed_var_df['auc_pr'].std():.4f}")
 print("   Saved → results/seed_variance.csv")
+
+
+# ─────────────────────────────────────────────────────────────
+# CELL 11.7 — Temporal validation (train earlier cohorts → test latest)
+# The honest deployment scenario: predict a future cohort from past ones.
+# Runs only when cohort_year is present (set up in CELL 7).
+# ─────────────────────────────────────────────────────────────
+if "cohort_year" in raw_df.columns and y_test_t.nunique() > 1:
+    from sklearn.base import clone
+    pre_t = clone(preprocessor)
+    Xtr_t = pre_t.fit_transform(X_train_t)
+    Xte_t = pre_t.transform(X_test_t)
+    m_t = xgb.XGBClassifier(**best_xgb_params, scale_pos_weight=spw,
+                            eval_metric="aucpr", random_state=SEED,
+                            verbosity=0, use_label_encoder=False)
+    m_t.fit(Xtr_t, y_train_t)
+    p_t = m_t.predict_proba(Xte_t)[:, 1]
+    temporal_df = pd.DataFrame([{
+        "train_cohorts": ",".join(str(int(yr)) for yr in years[:-1]),
+        "test_cohort":   int(latest),
+        "n_train":       int(len(X_train_t)),
+        "n_test":        int(len(X_test_t)),
+        "auc_roc":       round(roc_auc_score(y_test_t, p_t), 4),
+        "auc_pr":        round(average_precision_score(y_test_t, p_t), 4),
+    }])
+    temporal_df.to_csv(os.path.join(RESULTS_DIR, "temporal_validation.csv"), index=False)
+    print("✅ Temporal validation (train past cohorts → test latest):")
+    print(temporal_df.to_string(index=False))
+    print("   Saved → results/temporal_validation.csv")
+else:
+    print("ℹ️  Temporal validation skipped (no cohort_year, or test cohort single-class).")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -627,7 +674,11 @@ print("   Plot saved → shap_beeswarm.png")
 # CELL 12.5 — SHAP dependence plots (top-3 predictors)
 # How each top predictor's value relates to its SHAP impact on risk.
 # ─────────────────────────────────────────────────────────────
-import re
+import re, glob
+# Dependence-plot filenames depend on which features rank top-3, which can shift
+# between runs — clear stale ones so results/ only holds the current top-3.
+for stale in glob.glob(os.path.join(RESULTS_DIR, "shap_dependence_*.png")):
+    os.remove(stale)
 top3_features = global_importance.head(3).index.tolist()
 for feat in top3_features:
     plt.figure()
@@ -873,13 +924,17 @@ def fairness_metrics(y_true, y_pred, group_col, groups_df):
         ).round(4)
     return df_res
 
-# Use test-set rows with their raw categorical columns for grouping
-test_groups = X_test[CATEGORICAL_COLS].reset_index(drop=True)
+# Disaggregate by gender + programme, and by region when available (region is a
+# context variable, not a model predictor — pulled from raw_df by test index).
+fairness_cols = ["gender", "programme_type"]
+if "region" in raw_df.columns:
+    fairness_cols.append("region")
+test_groups = raw_df.loc[X_test.index, fairness_cols].reset_index(drop=True)
 xgb_test_labels = (xgb_proba >= 0.5).astype(int)
 y_test_arr = y_test.values
 
 print("✅ Fairness disaggregation (FNR prioritised):")
-for gcol in ["gender", "programme_type"]:
+for gcol in fairness_cols:
     print(f"\n   ── By {gcol} ──")
     fair_df = fairness_metrics(y_test_arr, xgb_test_labels, gcol, test_groups)
     print(fair_df.to_string(index=False))
@@ -1013,7 +1068,9 @@ checks = [
     ("Feature engineering applied",              True),
     ("Preprocessing pipeline built",             True),
     ("Stratified 70/15/15 split",                True),
-    ("Temporal split (if cohort_year exists)",
+    ("Temporal split (cohort_year present)",
+     "cohort_year" in raw_df.columns),
+    ("Temporal validation (past → latest cohort)",
      "cohort_year" in raw_df.columns),
     ("Baseline models trained + evaluated",      True),
     ("Hyperparameter grid search (AUC-PR)",      True),

@@ -56,6 +56,7 @@ xgboost-shap-nursing-licensure/
 │   ├── roc_pr_curves.png, calibration_curves.png
 │   ├── baseline_metrics.json, engineered_metrics.json
 │   ├── seed_variance.csv                   # 10-seed metric spread
+│   ├── temporal_validation.csv             # train past cohorts → test latest
 │   ├── ablation_table.csv                  # feature-group ablation (AUC-PR)
 │   ├── comparison_table.csv               # Table 1 of the Results chapter
 │   ├── inference_bundle.pkl               # model + preprocessor + transform (for the app)

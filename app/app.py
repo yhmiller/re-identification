@@ -27,7 +27,7 @@ RESEARCHER_EMAIL = "prince@princemiller.com"
 RESEARCHER_SITE = "https://www.princemiller.com"
 SUPERVISOR = "Dr. Eric Opoku Osei"
 INSTITUTION = "KNUST — Dept. of Computer Science"
-PROGRAMME = "MSc Health Informatics, 2025–2026"
+PROGRAMME = "MSc Health Informatics, 2025-2026"
 
 ABOUT_MD = f"""### {APP_TITLE}
 
@@ -51,6 +51,14 @@ MENU_ITEMS = {
 }
 
 
+HIDE_BRANDING_CSS = """
+    <style>
+    footer {visibility: hidden; height: 0;}
+    [data-testid="stStatusWidget"] {visibility: hidden;}
+    </style>
+"""
+
+
 @st.cache_resource
 def get_bundle():
     return inference.load_bundle()
@@ -70,6 +78,18 @@ def render_header():
         "so remediation can start early. Predictions are model estimates, not "
         "verdicts — use them alongside your own judgement."
     )
+
+
+def render_data_warning(bundle):
+    """Show an illustrative-only banner until the model is trained on real data."""
+    if bundle.get("data_source", "synthetic") != "real":
+        st.warning(
+            "oen**Demonstration mode** — this model is trained on **synthetic "
+            "pilot data**. The risk scores are illustrative only and must not be "
+            "used for real student decisions. The banner disappears automatically "
+            "once the model is retrained on the real college dataset.",
+            icon="⚠️",
+        )
 
 
 def render_sidebar(bundle):
@@ -203,6 +223,7 @@ def render_footer():
 def main():
     st.set_page_config(page_title=APP_TITLE, page_icon="🩺", layout="wide",
                        menu_items=MENU_ITEMS)
+    st.markdown(HIDE_BRANDING_CSS, unsafe_allow_html=True)
     render_header()
 
     try:
@@ -211,6 +232,7 @@ def main():
         st.error(str(err))
         st.stop()
 
+    render_data_warning(bundle)
     threshold = render_sidebar(bundle)
 
     uploaded = st.file_uploader("Upload student records (.csv or .xlsx)",

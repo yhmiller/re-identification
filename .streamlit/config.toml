@@ -1,0 +1,11 @@
+# Streamlit config for the educator screening app.
+# Strips Streamlit's default chrome so the app reads as the project's own tool.
+
+[client]
+# Hide the developer menu + Deploy button; the custom About / Get help items
+# (set via menu_items in app.py) are still shown.
+toolbarMode = "minimal"
+
+[browser]
+# Do not send usage telemetry to Streamlit.
+gatherUsageStats = false

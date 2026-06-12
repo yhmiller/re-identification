@@ -34,9 +34,12 @@ xgboost-shap-nursing-licensure/
 │   ├── eda_descriptives.csv,  eda_missingness.csv
 │   ├── eda_failrate_by_*.csv
 │   ├── eda_distributions.png, eda_correlation.png
-│   ├── shap_beeswarm.png,     shap_waterfall_student*.png
+│   ├── shap_beeswarm.png, shap_waterfall_student*.png, shap_dependence_*.png
 │   ├── calibration_curves.png, roc_pr_curves.png
 │   ├── baseline_metrics.json, engineered_metrics.json
+│   ├── seed_variance.csv             ← 10-seed metric spread (variance bands)
+│   ├── temporal_validation.csv       ← train past cohorts → test latest cohort
+│   ├── ablation_table.csv            ← feature-group ablation (AUC-PR)
 │   ├── comparison_table.csv          ← TABLE 1 of your Results chapter
 │   ├── inference_bundle.pkl          ← model + preprocessor + transform (feeds the app)
 │   └── config.yaml
