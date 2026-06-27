@@ -266,6 +266,20 @@ e = json.load(open(os.path.join(RESULTS_DIR, "engineered_metrics.json")))
 metrics = ["acc", "f1", "auc_roc", "auc_pr"]
 metric_names = {"acc": "Accuracy", "f1": "Macro F1",
                 "auc_roc": "AUC-ROC", "auc_pr": "AUC-PR"}
+
+
+def cohens_d_label(d):
+    """Conventional magnitude bands for Cohen's d (Cohen, 1988)."""
+    ad = abs(d)
+    if ad < 0.2:
+        return "negligible"
+    if ad < 0.5:
+        return "small"
+    if ad < 0.8:
+        return "medium"
+    return "large"
+
+
 rows = []
 for m in metrics:
     bvals, evals = np.array(b[m]), np.array(e[m])
@@ -278,6 +292,10 @@ for m in metrics:
         except ValueError:
             p = 1.0
     delta = evals.mean() - bvals.mean()
+    # Cohen's d for paired samples (d_z = mean difference / SD of the differences).
+    diff = evals - bvals
+    sd_diff = diff.std(ddof=1)
+    d = float(diff.mean() / sd_diff) if sd_diff > 0 else 0.0
     rows.append({
         "Metric":   metric_names[m],
         "XGBoost (Baseline)": f"{bvals.mean():.4f} ± {bvals.std():.4f}",
@@ -285,6 +303,7 @@ for m in metrics:
         "Δ Change": f"{delta:+.4f}",
         "p-value":  f"{p:.4f}",
         "Sig (p<0.05)": "Yes" if p < 0.05 else "ns",
+        "Cohen's d": f"{d:+.3f} ({cohens_d_label(d)})",
         "Better?": "✓" if delta >= 0 else "✗",
     })
 
@@ -296,6 +315,7 @@ rows.append({
     "E-XGBoost (Engineered)": f"{et.mean():.3f} ± {et.std():.3f}",
     "Δ Change": f"{et.mean()-bt.mean():+.3f}s",
     "p-value": "—", "Sig (p<0.05)": "—",
+    "Cohen's d": "—",
     "Better?": "✓" if et.mean() <= bt.mean() else "~",
 })
 rows.append({
@@ -304,6 +324,7 @@ rows.append({
     "E-XGBoost (Engineered)": f"{len(kept_features)}",
     "Δ Change": f"{len(kept_features)-len(ALL_FEATURE_LIST)}",
     "p-value": "—", "Sig (p<0.05)": "—",
+    "Cohen's d": "—",
     "Better?": "✓ (leaner)",
 })
 
@@ -373,3 +394,71 @@ print(f"""
      pruning result is illustrative only — the real SHAP rankings
      will differ and determine which features are actually pruned.
 """)
+
+
+# ─────────────────────────────────────────────────────────────
+# ENG-CELL 11 — Export the E-XGBoost inference bundle for the educator app
+# So the app serves the REPORTED contribution (E-XGBoost), not the full-feature
+# Stage 1 model. The deployed model mirrors Stage 1's production recipe (tuned
+# params + scale_pos_weight + early stopping) but on the retained feature set.
+# The raw upload schema is unchanged: engineer_features still needs all raw
+# inputs to compute the retained engineered features; the model simply uses
+# fewer of the resulting columns. This OVERWRITES the Stage 1 bundle on purpose.
+# ─────────────────────────────────────────────────────────────
+import cloudpickle
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+
+ex_num = [c for c in kept_features if c in ALL_NUMERIC]
+ex_cat = [c for c in kept_features if c in CATEGORICAL_COLS]
+
+ex_transformers = []
+if ex_num:
+    ex_transformers.append(("num", Pipeline([
+        ("imputer", SimpleImputer(strategy="median")),
+        ("scaler", MinMaxScaler())]), ex_num))
+if ex_cat:
+    ex_transformers.append(("cat", Pipeline([
+        ("imputer", SimpleImputer(strategy="most_frequent")),
+        ("encoder", OneHotEncoder(handle_unknown="ignore", sparse_output=False))]), ex_cat))
+ex_pre = ColumnTransformer(ex_transformers, remainder="drop")
+
+# X_train already carries the engineered columns (Stage 1 engineered raw_df before
+# splitting), so selecting kept_features is sufficient — no re-engineering here.
+ex_pre.fit(X_train[kept_features])
+ex_Xtr = ex_pre.transform(X_train[kept_features])
+ex_Xva = ex_pre.transform(X_val[kept_features])
+
+# Encoded names in Stage 1's clean convention (no num__/cat__ prefixes) so the
+# app's labels.py humanises them correctly.
+ex_cat_names = (
+    ex_pre.named_transformers_["cat"].named_steps["encoder"]
+    .get_feature_names_out(ex_cat).tolist() if ex_cat else []
+)
+ex_feature_names = ex_num + ex_cat_names
+
+ex_spw = globals().get("spw", 1)
+ex_model = xgb.XGBClassifier(
+    **XGB_PARAMS, scale_pos_weight=ex_spw, eval_metric="aucpr",
+    early_stopping_rounds=50, random_state=SEED, verbosity=0, use_label_encoder=False,
+)
+ex_model.fit(ex_Xtr, y_train, eval_set=[(ex_Xva, y_val)], verbose=False)
+
+EX_BUNDLE = {
+    "model": ex_model,
+    "preprocessor": ex_pre,
+    "engineer_features": engineer_features,
+    "feature_columns": kept_features,
+    "encoded_feature_names": ex_feature_names,
+    "raw_numeric_columns": NUMERIC_COLS,
+    "categorical_columns": CATEGORICAL_COLS,
+    "target": TARGET,
+    "data_source": globals().get("DATA_SOURCE", "synthetic"),
+    "model_name": "E-XGBoost",
+}
+with open(os.path.join(RESULTS_DIR, "inference_bundle.pkl"), "wb") as f:
+    cloudpickle.dump(EX_BUNDLE, f)
+print(f"✅ E-XGBoost inference bundle saved → results/inference_bundle.pkl "
+      f"({len(kept_features)} retained features; the app now serves E-XGBoost)")
