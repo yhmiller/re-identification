@@ -164,7 +164,7 @@ for feat, c in cum.items():
 # Standard XGBoost uses ALL collected features, including many that
 # contribute almost nothing to the prediction (per SHAP).
 # We REMOVE the lowest-SHAP features so the model is leaner and its
-# explanations are cleaner for nurse educators — without losing accuracy.
+# explanations are cleaner for allied health educators — without losing accuracy.
 # This single modification creates E-XGBoost.
 KEEP_CUM_THRESHOLD = engineered_xgboost.KEEP_CUM_THRESHOLD   # keep features explaining 95% of SHAP mass
 # ========================================================================
@@ -297,15 +297,29 @@ paragraph = model_comparison.generate_results_paragraph(
     b, e, ALL_FEATURE_LIST, kept_features, KEEP_CUM_THRESHOLD, N_PAIRED_FOLDS)
 n_removed = len(ALL_FEATURE_LIST) - len(kept_features)
 
-# Save to academic_summary.txt so it remains easily copy-pasteable without terminal clutter
-summary_text = f"""RESULTS PARAGRAPH (paste into your paper, replace with final numbers):
+# The summary is stamped with the run's own provenance, exactly as the figure
+# captions are, so a paragraph copied out of it cannot lose its data-source
+# label on the way into the thesis.
+SOURCE_NOTE_TEXT = globals().get("SOURCE_NOTE", "SYNTHETIC DATA — pipeline testing only")
+DATA_SOURCE_LABEL = globals().get("DATA_SOURCE", "synthetic")
+OBSERVED_OUTCOME_SOURCE = "real"
 
-{paragraph}
+if DATA_SOURCE_LABEL == OBSERVED_OUTCOME_SOURCE:
+    OUTCOME_CAVEAT = (
+        "OBSERVED licensure outcomes from the registrar's return.\n"
+        "     Reportable as findings: YES.")
+else:
+    OUTCOME_CAVEAT = (
+        "SIMULATED LICENSURE OUTCOMES — reportable as findings: NO.\n"
+        "     The academic records behind this run may be genuine college\n"
+        "     records; the licensure outcomes they were trained against are\n"
+        "     GENERATED. Every AUC, p-value and pruned feature set above is\n"
+        "     therefore illustrative only. When the college returns the real\n"
+        "     outcomes, the SHAP rankings will differ and will determine which\n"
+        "     features are actually pruned.")
 
-======================================================================
-MODEL ENGINEERING — CONTRIBUTION 3 SUMMARY
-======================================================================
-
+contribution_block = f"""
+  Data source       : {DATA_SOURCE_LABEL} — {SOURCE_NOTE_TEXT}
   Operation applied : R (Remove) — SHAP-guided feature pruning
   Baseline model    : XGBoost, all {len(ALL_FEATURE_LIST)} features
   Engineered model  : E-XGBoost, {len(kept_features)} features
@@ -315,14 +329,24 @@ MODEL ENGINEERING — CONTRIBUTION 3 SUMMARY
                       comparison_table.csv
 
   DEFENCE-DAY THREE CONTRIBUTIONS:
-  1. Original field data — first Ghanaian nursing-licensure dataset
+  1. Original field data — first Ghanaian allied-health-licensure dataset
   2. Modern ML model — XGBoost + SHAP
   3. Engineered model — E-XGBoost (SHAP-guided pruning) vs baseline
 
-  ⚠️  I will RUN this on REAL data once cleaned. On synthetic data the
-     pruning result is illustrative only - the real SHAP rankings
-     will differ and determine which features are actually pruned.
+  ⚠️  {OUTCOME_CAVEAT}
 """
+
+# Save to academic_summary.txt so it remains easily copy-pasteable without terminal clutter
+summary_text = f"""RESULTS PARAGRAPH — DATA SOURCE: {DATA_SOURCE_LABEL}
+({SOURCE_NOTE_TEXT})
+(paste into your paper, replace with final numbers):
+
+{paragraph}
+
+======================================================================
+MODEL ENGINEERING — CONTRIBUTION 3 SUMMARY
+======================================================================
+{contribution_block}"""
 
 summary_path = os.path.join(RESULTS_DIR, "academic_summary.txt")
 with open(summary_path, "w", encoding="utf-8") as f:
@@ -336,24 +360,7 @@ else:
     print("=" * 70)
     print("MODEL ENGINEERING — CONTRIBUTION 3 SUMMARY")
     print("=" * 70)
-    print(f"""
-  Operation applied : R (Remove) — SHAP-guided feature pruning
-  Baseline model    : XGBoost, all {len(ALL_FEATURE_LIST)} features
-  Engineered model  : E-XGBoost, {len(kept_features)} features
-  Features pruned   : {n_removed}
-  Comparison        : {N_CV_FOLDS}-fold CV x {N_CV_REPEATS} repeats ({N_PAIRED_FOLDS} paired folds), Wilcoxon test
-  Artefacts         : baseline_metrics.json, engineered_metrics.json,
-                      comparison_table.csv
-
-  DEFENCE-DAY THREE CONTRIBUTIONS:
-  1. Original field data — first Ghanaian nursing-licensure dataset
-  2. Modern ML model — XGBoost + SHAP
-  3. Engineered model — E-XGBoost (SHAP-guided pruning) vs baseline
-
-  ⚠️  I will RUN this on REAL data once cleaned. On synthetic data the
-     pruning result is illustrative only - the real SHAP rankings
-     will differ and determine which features are actually pruned.
-""")
+    print(contribution_block)
 
 
 # ─────────────────────────────────────────────────────────────

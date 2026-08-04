@@ -9,7 +9,7 @@
 # those modules so it is reusable and independently testable — see
 # docs/TODO.md, "Codebase restructure: extract core logic into modules".
 #
-# Project : Explainable ML for Predicting NMC-LE Failure in Ghana
+# Project : Explainable ML for Predicting AHPC-LE Failure in Ghana
 # Author  : Prince Bortey Miller | ID: 22388461 | KNUST
 # Supervisor: Dr. Eric Opoku Osei
 # ============================================================
@@ -195,11 +195,33 @@ if ALPHA_CORPUS:
     print("⚠️  Outcomes here are GENERATED. Nothing from this run is reportable.")
 elif SYNTHETIC_OUTCOMES:
     raw_df = real_data.load(outcomes_from=SYNTHETIC_OUTCOMES)
+    provenance = raw_df.attrs.get("outcome_provenance", "UNKNOWN")
     prevalence = raw_df.attrs.get("outcome_prevalence", float("nan"))
-    DATA_SOURCE = f"real_synthetic_outcome_p{int(round(prevalence * 1000)):03d}"
-    print(f"⚠️  REAL academic records with SIMULATED outcomes: {len(raw_df)} students")
-    print(f"⚠️  Prevalence {prevalence} is an ASSUMPTION — no AHPC pass rate is published.")
-    print("⚠️  Outcomes here are GENERATED. Nothing from this run is reportable.")
+    if provenance == real_data.REGISTRAR_PROVENANCE:
+        # The registrar's genuine return carries OBSERVED outcomes, so it must
+        # not land in a real_synthetic_outcome_pNNN/ directory: that NNN is an
+        # assumed prevalence, and these outcomes are measured, not assumed.
+        DATA_SOURCE = "real"
+        print(f"✅ REGISTRAR RETURN: {len(raw_df)} students with OBSERVED outcomes "
+              f"from {SYNTHETIC_OUTCOMES}")
+        print(f"   Observed failure rate: {raw_df[TARGET].mean():.3f} (measured, not assumed).")
+    elif pd.isna(prevalence):
+        # Failing here rather than defaulting: a guessed prevalence would name
+        # the results directory after a number nothing in the run supports.
+        raise ValueError(
+            f"{SYNTHETIC_OUTCOMES} declares record_type '{provenance}' but its "
+            f"'{real_data.PROVENANCE_SHEET}' sheet supplies no usable "
+            "'prevalence' field. A simulated run is filed under "
+            "results/real_synthetic_outcome_pNNN/ and NNN comes from that "
+            "field, so it cannot be defaulted without mislabelling the "
+            "directory. Either add the prevalence to the workbook, or supply "
+            "the registrar's genuine return, which needs no provenance sheet "
+            "and runs as observed data.")
+    else:
+        DATA_SOURCE = f"real_synthetic_outcome_p{int(round(prevalence * 1000)):03d}"
+        print(f"⚠️  REAL academic records with SIMULATED outcomes: {len(raw_df)} students")
+        print(f"⚠️  Prevalence {prevalence} is an ASSUMPTION — no AHPC pass rate is published.")
+        print("⚠️  Outcomes here are GENERATED. Nothing from this run is reportable.")
 elif FORCE_PILOT:
     raw_df, DATA_SOURCE = syn_df.copy(), "synthetic"
     print("ℹ️  FORCE_PILOT set — using pilot data.")
@@ -489,7 +511,7 @@ shap.summary_plot(shap_values, X_test_proc,
                   feature_names=FEATURE_NAMES,
                   plot_type="violin",
                   show=False)
-plt.title("Global SHAP Feature Importance — NMC-LE Failure Prediction\n"
+plt.title("Global SHAP Feature Importance — AHPC-LE Failure Prediction\n"
           f"({SOURCE_NOTE})",
           fontsize=11, style="italic")
 plt.tight_layout()
@@ -713,7 +735,7 @@ print("   Saved → " + RESULTS_DIR + "/ablation_table.csv")
 # ─────────────────────────────────────────────────────────────
 
 config = f"""# config.yaml
-# XGBoost hyperparameters — NMC-LE failure prediction
+# XGBoost hyperparameters — AHPC-LE failure prediction
 # Author: Prince Bortey Miller | KNUST 2026
 
 model:

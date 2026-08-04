@@ -59,6 +59,16 @@ COEF_DEMOGRAPHIC = 0.12
 #
 # NOISE_SD_ALPHA, against 330 copula-sampled rows:
 #     0.85 -> 0.956   1.5 -> 0.868   2.5 -> 0.784   3.5 -> 0.715   4.5 -> 0.681
+#
+# Those five numbers were measured at prevalence 0.261, against 36 predictors,
+# and before semester GPAs became credit-weighted or gpa_mean was dropped. None
+# of those conditions still hold, and the sweep has not been re-run under the
+# current ones. The regenerated alpha corpus records AUC-ROC 0.7955 at this same
+# noise_sd=2.5 (data/SYNTHETIC_alpha_corpus.xlsx, PROVENANCE_read_first sheet),
+# so read 0.7955 as the currently observed value and the table above as history.
+# 2.5 stays because 0.7955 still falls inside PLAUSIBLE_AUC; it is a retained
+# pick under changed conditions, not a re-optimised one. Contrast
+# NOISE_SD_REAL_110 below, whose grid was re-measured after those changes.
 NOISE_SD_ALPHA = 2.5
 
 # NOISE_SD_REAL_110, against the 106 trainable real records at prevalence 0.40,

@@ -43,10 +43,29 @@ class OutcomeJoinError(RuntimeError):
 
 OUTCOME_RETURN_SHEET = "OUTCOMES"
 OUTCOME_RETURN_COLUMN = "licensure_outcome"
+PROVENANCE_SHEET = "PROVENANCE_read_first"
+REGISTRAR_PROVENANCE = "REGISTRAR_RETURN"
 
 # Codes the registrar may return instead of a pass or fail. Each means "no
 # first-attempt result", so the row cannot train or evaluate anything.
 NON_NUMERIC_OUTCOMES = frozenset({"absent", "deferred", "withheld", "unknown"})
+
+
+def _read_provenance(path):
+    """Return (provenance, prevalence) for a registrar-format return workbook.
+
+    A simulated return carries a provenance sheet recording how it was
+    generated. The registrar's genuine return has no such sheet because there
+    is nothing to record, so its absence identifies a real return rather than a
+    malformed one, and its prevalence is unknown until the outcomes are read.
+    """
+    with pd.ExcelFile(path) as workbook:
+        if PROVENANCE_SHEET not in workbook.sheet_names:
+            return REGISTRAR_PROVENANCE, float("nan")
+        provenance = pd.read_excel(workbook, sheet_name=PROVENANCE_SHEET)
+    fields = provenance.set_index("field")["how it was produced"]
+    return (fields.get("record_type", "UNKNOWN"),
+            float(fields.get("prevalence", "nan")))
 
 
 def _apply_outcome_return(df, outcomes_from):
@@ -67,15 +86,24 @@ def _apply_outcome_return(df, outcomes_from):
             "Every record must be present; a partial return would attach "
             "outcomes to the wrong students.")
 
+    # A repeated row is a realistic registrar mistake, and there is no way to
+    # tell which of the two outcomes is the right one, so it must fail here
+    # rather than let pandas raise an indexing error out of the join below.
+    repeated = returned["student_id"][returned["student_id"].duplicated()].unique()
+    if len(repeated):
+        raise OutcomeJoinError(
+            f"{path.name} repeats {len(repeated)} student_id(s): "
+            f"{sorted(repeated.tolist())}. Each student must appear exactly "
+            "once; a repeated row leaves the correct outcome ambiguous.")
+
     lookup = returned.set_index("student_id")[OUTCOME_RETURN_COLUMN]
     raw = df["student_id"].map(lookup).astype(str).str.strip().str.lower()
     df[OUTCOME_SOURCE_COLUMN] = pd.to_numeric(
         raw.where(~raw.isin(NON_NUMERIC_OUTCOMES)), errors="coerce")
 
-    provenance = pd.read_excel(path, sheet_name="PROVENANCE_read_first")
-    fields = provenance.set_index("field")["how it was produced"]
-    df.attrs["outcome_provenance"] = fields.get("record_type", "UNKNOWN")
-    df.attrs["outcome_prevalence"] = float(fields.get("prevalence", "nan"))
+    provenance, prevalence = _read_provenance(path)
+    df.attrs["outcome_provenance"] = provenance
+    df.attrs["outcome_prevalence"] = prevalence
     return df
 
 
