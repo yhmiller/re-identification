@@ -177,6 +177,12 @@ FORCE_PILOT = False
 # overwrite a real one.
 ALPHA_CORPUS = os.environ.get("ALPHA_CORPUS")
 
+# Optional override that keeps the REAL academic records but supplies a
+# simulated licensure outcome from a registrar-format return workbook. Results
+# land in their own per-prevalence directory and every caption is labelled, so
+# a simulated run can never be mistaken for or overwrite a real one.
+SYNTHETIC_OUTCOMES = os.environ.get("SYNTHETIC_OUTCOMES")
+
 flow = real_data.summarise()
 print(f"ℹ️  College dataset: {flow['records_total']} records | "
       f"outcomes supplied {flow['outcomes_supplied']} | "
@@ -186,6 +192,13 @@ if ALPHA_CORPUS:
     raw_df = engineer_features(pd.read_excel(ALPHA_CORPUS, sheet_name="SYNTHETIC_data"))
     DATA_SOURCE = "synthetic_alpha"
     print(f"⚠️  SIMULATED ALPHA CORPUS: {len(raw_df)} rows from {ALPHA_CORPUS}")
+    print("⚠️  Outcomes here are GENERATED. Nothing from this run is reportable.")
+elif SYNTHETIC_OUTCOMES:
+    raw_df = real_data.load(outcomes_from=SYNTHETIC_OUTCOMES)
+    prevalence = raw_df.attrs.get("outcome_prevalence", float("nan"))
+    DATA_SOURCE = f"real_synthetic_outcome_p{int(round(prevalence * 1000)):03d}"
+    print(f"⚠️  REAL academic records with SIMULATED outcomes: {len(raw_df)} students")
+    print(f"⚠️  Prevalence {prevalence} is an ASSUMPTION — no AHPC pass rate is published.")
     print("⚠️  Outcomes here are GENERATED. Nothing from this run is reportable.")
 elif FORCE_PILOT:
     raw_df, DATA_SOURCE = syn_df.copy(), "synthetic"
@@ -203,10 +216,14 @@ else:
 # Figure captions derive their data-source label from DATA_SOURCE rather than
 # hardcoding it, so a real-data run cannot silently ship plots captioned
 # "SYNTHETIC DATA".
-SOURCE_NOTE = {
-    "synthetic":       "SYNTHETIC DATA — pipeline testing only",
-    "synthetic_alpha": "SIMULATED ALPHA CORPUS — generated outcomes, not reportable",
-}.get(DATA_SOURCE, "Institutional cohort")
+if DATA_SOURCE.startswith("real_synthetic_outcome"):
+    SOURCE_NOTE = (f"Real academic records, SIMULATED outcomes "
+                   f"(prevalence {raw_df.attrs.get('outcome_prevalence')}) — not reportable")
+else:
+    SOURCE_NOTE = {
+        "synthetic":       "SYNTHETIC DATA — pipeline testing only",
+        "synthetic_alpha": "SIMULATED ALPHA CORPUS — generated outcomes, not reportable",
+    }.get(DATA_SOURCE, "Institutional cohort")
 
 # Results land in results/<DATA_SOURCE>/ so a real run and a synthetic run
 # never overwrite each other's artefacts (see docs/TODO.md, "Performance
