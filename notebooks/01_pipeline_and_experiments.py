@@ -99,8 +99,8 @@ try:
 except NameError:
     pass  # __file__ is undefined in a pasted Colab cell — rely on the cwd
 
-from nmcle_schema import (
-    NMC_SUBJECTS, CA_COLS, MOCK_COLS,
+from schema import (
+    GPA_COLS, GRADE_COUNT_COLS,
     NUMERIC_COLS, CATEGORICAL_COLS, ALL_FEATURES, TARGET,
     engineer_features, ENGINEERED_NUMERIC, ALL_NUMERIC, ALL_FEATURES_V2,
 )
@@ -108,6 +108,7 @@ from nmcle_schema import (
 # Reusable core-logic modules (repo root) — see docs/TODO.md for the map of
 # which notebook cell each one used to be.
 import synthetic_data
+import real_data
 import baseline_xgboost
 import stats_validation
 import prediction
@@ -128,21 +129,20 @@ print(f"   Target : '{TARGET}' (1 = fail, 0 = pass)")
 # ─────────────────────────────────────────────────────────────
 
 syn_df = synthetic_data.generate_pilot_data(
-    CA_COLS, MOCK_COLS, NMC_SUBJECTS, TARGET, SEED,
+    GPA_COLS, GRADE_COUNT_COLS, TARGET, SEED,
     n_reference=30, n_rows=1000,
 )
 
 print("✅ Synthetic data generated.")
 print(f"   Shape  : {syn_df.shape}")
 print(f"   Columns: {list(syn_df.columns)}")
-print(f"\n   Target distribution (SYNTHETIC DATA — NOT real results):")
+print("\n   Target distribution (synthetic generator output):")
 print(syn_df[TARGET].value_counts(normalize=True).rename({0: "Pass", 1: "Fail"}))
 print("\n   ⚠️  SYNTHETIC DATA — used for pipeline testing only.")
-print("   Real data will be loaded in CELL 6 when available.")
+print("   Real data is loaded in CELL 6 when outcomes are available.")
 print("\n   Preview:")
-print(syn_df[["wassce_aggregate", "programme_cgpa",
-              "ca_medical_surgical", "mock_medical_surgical",
-              TARGET]].head(5).to_string(index=False))
+print(syn_df[["cgpa", "gpa_sem1", "gpa_sem6", "n_courses",
+              "programme", TARGET]].head(5).to_string(index=False))
 
 
 # ─────────────────────────────────────────────────────────────
@@ -160,28 +160,53 @@ print(f"   Engineered features added: {len(ENGINEERED_NUMERIC)}")
 
 
 # ─────────────────────────────────────────────────────────────
-# CELL 6 — Load real data (when available)
-# Currently loads synthetic data as a placeholder.
-# When real data arrives: uncomment the pd.read_csv line,
-# point to your Google Drive path, and comment out syn_df.
-# EVERYTHING BELOW THIS CELL RUNS UNCHANGED.
+# CELL 6 — Select the data source
+# The real college records are used automatically as soon as the licensure
+# outcomes are populated in data/model_dataset_2021_2022.xlsx. Until then the
+# pipeline falls back to pilot data so the machinery stays exercisable.
+# EVERYTHING BELOW THIS CELL RUNS UNCHANGED either way.
+#
+# To force pilot data even when outcomes exist, set FORCE_PILOT = True.
 # ─────────────────────────────────────────────────────────────
-try:
-    from google.colab import drive
-    # drive.mount('/content/drive')   # ← uncomment when using Drive
-except ModuleNotFoundError:
-    pass  # not on Colab — running locally, Drive mount not needed
+FORCE_PILOT = False
 
-# ── Option A: Load real anonymised data (uncomment when ready) ──
-# REAL_DATA_PATH = "/content/drive/MyDrive/nursing_data/anonymised_records.csv"
-# raw_df = pd.read_csv(REAL_DATA_PATH)
-# raw_df = engineer_features(raw_df)
-# DATA_SOURCE = "real"
+# Optional override for exercising the pipeline against a simulated corpus that
+# carries fields the real extraction lacks (sex, age band, region). Set
+# ALPHA_CORPUS=<path> in the environment. Results land in their own directory
+# and every caption is labelled, so an alpha run can never be mistaken for or
+# overwrite a real one.
+ALPHA_CORPUS = os.environ.get("ALPHA_CORPUS")
 
-# ── Option B: Use synthetic pilot data (default for now) ────────
-raw_df = syn_df.copy()
-DATA_SOURCE = "synthetic"   # flips the app's illustrative-only banner; set to "real" above
-print("ℹ️  Using SYNTHETIC data (pipeline testing mode).")
+flow = real_data.summarise()
+print(f"ℹ️  College dataset: {flow['records_total']} records | "
+      f"outcomes supplied {flow['outcomes_supplied']} | "
+      f"cohorts {flow['cohorts']} | programmes {flow['programmes']}")
+
+if ALPHA_CORPUS:
+    raw_df = engineer_features(pd.read_excel(ALPHA_CORPUS, sheet_name="SYNTHETIC_data"))
+    DATA_SOURCE = "synthetic_alpha"
+    print(f"⚠️  SIMULATED ALPHA CORPUS: {len(raw_df)} rows from {ALPHA_CORPUS}")
+    print("⚠️  Outcomes here are GENERATED. Nothing from this run is reportable.")
+elif FORCE_PILOT:
+    raw_df, DATA_SOURCE = syn_df.copy(), "synthetic"
+    print("ℹ️  FORCE_PILOT set — using pilot data.")
+else:
+    try:
+        raw_df = real_data.load()
+        DATA_SOURCE = "real"
+        print(f"✅ Using REAL college records: {len(raw_df)} students with outcomes.")
+    except real_data.OutcomeNotSuppliedError as exc:
+        raw_df, DATA_SOURCE = syn_df.copy(), "synthetic"
+        print(f"ℹ️  {exc}")
+        print("ℹ️  Falling back to SYNTHETIC pilot data (pipeline testing mode).")
+
+# Figure captions derive their data-source label from DATA_SOURCE rather than
+# hardcoding it, so a real-data run cannot silently ship plots captioned
+# "SYNTHETIC DATA".
+SOURCE_NOTE = {
+    "synthetic":       "SYNTHETIC DATA — pipeline testing only",
+    "synthetic_alpha": "SIMULATED ALPHA CORPUS — generated outcomes, not reportable",
+}.get(DATA_SOURCE, "Institutional cohort")
 
 # Results land in results/<DATA_SOURCE>/ so a real run and a synthetic run
 # never overwrite each other's artefacts (see docs/TODO.md, "Performance
@@ -219,7 +244,26 @@ else:
 #      baseline_xgboost.temporal_validation in CELL 11.7)
 # ─────────────────────────────────────────────────────────────
 
-X = raw_df[ALL_FEATURES_V2]
+# Drop predictors that take one value across the whole cohort. A constant
+# column cannot be split on, contributes exactly zero SHAP attribution, and
+# would otherwise be reported as a feature the model "uses". This matters here
+# because programme and region were constant in the single-programme extraction
+# the schema was originally written against.
+_candidate = raw_df[ALL_FEATURES_V2]
+ZERO_VARIANCE = [c for c in ALL_FEATURES_V2 if _candidate[c].nunique(dropna=True) <= 1]
+MODEL_FEATURES = [c for c in ALL_FEATURES_V2 if c not in ZERO_VARIANCE]
+
+if ZERO_VARIANCE:
+    print(f"ℹ️  Dropped {len(ZERO_VARIANCE)} zero-variance predictor(s): {ZERO_VARIANCE}")
+else:
+    print("✅ No zero-variance predictors; all "
+          f"{len(MODEL_FEATURES)} features retained.")
+
+_missing_pct = (_candidate[MODEL_FEATURES].isna().mean() * 100)
+print(f"   Maximum missingness across predictors: {_missing_pct.max():.2f}% "
+      f"({int((_missing_pct > 0).sum())} of {len(MODEL_FEATURES)} affected)")
+
+X = raw_df[MODEL_FEATURES]
 y = raw_df[TARGET]
 
 # ── Stratified random split ──────────────────────────────────
@@ -249,7 +293,12 @@ else:
 # This is a reusable sklearn Pipeline object. (baseline_xgboost.build_preprocessor)
 # ─────────────────────────────────────────────────────────────
 
-preprocessor = baseline_xgboost.build_preprocessor(ALL_NUMERIC, CATEGORICAL_COLS)
+# Built from the surviving features, not the full schema list: a predictor
+# dropped for zero variance above is absent from X, and passing it here would
+# make the ColumnTransformer ask for a column that no longer exists.
+MODEL_NUMERIC = [c for c in ALL_NUMERIC if c in MODEL_FEATURES]
+MODEL_CATEGORICAL = [c for c in CATEGORICAL_COLS if c in MODEL_FEATURES]
+preprocessor = baseline_xgboost.build_preprocessor(MODEL_NUMERIC, MODEL_CATEGORICAL)
 
 # Quick smoke test
 X_train_proc = preprocessor.fit_transform(X_train)
@@ -257,7 +306,7 @@ X_val_proc   = preprocessor.transform(X_val)
 X_test_proc  = preprocessor.transform(X_test)
 
 FEATURE_NAMES = baseline_xgboost.encoded_feature_names(
-    preprocessor, ALL_NUMERIC, CATEGORICAL_COLS)
+    preprocessor, MODEL_NUMERIC, MODEL_CATEGORICAL)
 
 print("✅ Preprocessing pipeline built and fitted.")
 print(f"   Input features  : {X_train.shape[1]}")
@@ -315,6 +364,23 @@ print(f"   Best iteration: {xgb_clf.best_iteration}")
 all_results = baseline_results + [xgb_res]
 stats_validation.print_metrics(all_results)
 
+# Probability calibration. The raw XGBoost score ranks well but is not a
+# probability, so the risk percentage the educator app shows a tutor is not
+# trustworthy without this. Isotonic needs a few hundred validation points;
+# below that Platt scaling is the safer choice, so pick on validation size.
+CALIBRATION_METHOD = "isotonic" if len(y_val) >= 200 else "sigmoid"
+xgb_calibrated, calib_res, xgb_proba_calibrated = baseline_xgboost.calibrate(
+    xgb_clf, X_val_proc, y_val, X_test_proc, y_test, method=CALIBRATION_METHOD)
+
+print(f"\n✅ Probability calibration ({calib_res['method']}, fitted on validation fold):")
+print(f"   No-skill Brier            : {calib_res['brier_no_skill']:.4f}")
+print(f"   Brier before calibration  : {xgb_res['brier']:.4f} "
+      f"(skill {1 - xgb_res['brier'] / calib_res['brier_no_skill']:+.3f})")
+print(f"   Brier after  calibration  : {calib_res['brier']:.4f} "
+      f"(skill {calib_res['brier_skill_score']:+.3f})")
+print(f"   Ranking unchanged by design: AUC-ROC {calib_res['auc_roc']:.4f} | "
+      f"AUC-PR {calib_res['auc_pr']:.4f}")
+
 joblib.dump(xgb_clf, os.path.join(RESULTS_DIR, "xgboost_model.pkl"))
 print("\n   Model saved → " + RESULTS_DIR + "/xgboost_model.pkl")
 
@@ -326,7 +392,7 @@ INFERENCE_BUNDLE = {
     "model": xgb_clf,
     "preprocessor": preprocessor,
     "engineer_features": engineer_features,
-    "feature_columns": ALL_FEATURES_V2,   # order the preprocessor expects
+    "feature_columns": MODEL_FEATURES,   # order the preprocessor expects
     "encoded_feature_names": FEATURE_NAMES,
     "raw_numeric_columns": NUMERIC_COLS,
     "categorical_columns": CATEGORICAL_COLS,
@@ -407,7 +473,7 @@ shap.summary_plot(shap_values, X_test_proc,
                   plot_type="violin",
                   show=False)
 plt.title("Global SHAP Feature Importance — NMC-LE Failure Prediction\n"
-          "(SYNTHETIC DATA — for pipeline testing only)",
+          f"({SOURCE_NOTE})",
           fontsize=11, style="italic")
 plt.tight_layout()
 plt.savefig(os.path.join(RESULTS_DIR, "shap_beeswarm.png"), dpi=150, bbox_inches="tight")
@@ -429,7 +495,7 @@ for feat in top3_features:
     plt.figure()
     shap.dependence_plot(feat, shap_values, X_test_proc,
                          feature_names=FEATURE_NAMES, show=False)
-    plt.title(f"SHAP dependence — {feat}\n(SYNTHETIC DATA)",
+    plt.title(f"SHAP dependence — {feat}\n({SOURCE_NOTE})",
               fontsize=10, style="italic")
     plt.tight_layout()
     safe = re.sub(r"[^0-9a-zA-Z]+", "_", feat).strip("_")
@@ -453,7 +519,7 @@ if len(fail_idx) > 0:
         fig, ax = plt.subplots(figsize=(10, 4))
         shap.plots.waterfall(shap_explanation[idx], show=False, max_display=12)
         plt.title(f"Student {rank} — Predicted Fail (p={xgb_proba[idx]:.3f})\n"
-                  "(SYNTHETIC DATA)", fontsize=10, style="italic")
+                  f"({SOURCE_NOTE})", fontsize=10, style="italic")
         plt.tight_layout()
         plt.savefig(os.path.join(RESULTS_DIR, f"shap_waterfall_student{rank}.png"),
                     dpi=150, bbox_inches="tight")
@@ -486,16 +552,23 @@ for mname, proba in models_eval:
         ax=ax
     )
 
-ax.set_title("Calibration Curves — All Models\n(SYNTHETIC DATA)", style="italic")
+ax.set_title(f"Calibration Curves — All Models\n({SOURCE_NOTE})", style="italic")
 ax.legend(loc="upper left", fontsize=8)
 plt.tight_layout()
 plt.savefig(os.path.join(RESULTS_DIR, "calibration_curves.png"), dpi=150, bbox_inches="tight")
 plt.show()
 print("✅ Calibration curves saved → calibration_curves.png")
 
-print("\n   Brier scores (lower = better calibrated):")
+# A raw Brier score is uninterpretable without its no-skill floor: always
+# predicting the base rate scores p(1-p), so at 30% prevalence a "good-looking"
+# 0.21 is worth nothing. The skill score expresses the gain over that floor.
+brier_no_skill = float(y_test.mean() * (1 - y_test.mean()))
+print(f"\n   Brier scores (lower = better calibrated)")
+print(f"   No-skill floor (always predict base rate): {brier_no_skill:.4f}")
 for mname, proba in models_eval:
-    print(f"   {mname:<25}: {brier_score_loss(y_test, proba):.4f}")
+    brier = brier_score_loss(y_test, proba)
+    skill = 1 - (brier / brier_no_skill)
+    print(f"   {mname:<25}: {brier:.4f}   skill score {skill:+.3f}")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -512,13 +585,24 @@ for mname, proba in models_eval:
         y_test, proba, name=mname, ax=axes[1]
     )
 
-axes[0].set_title("ROC Curves\n(SYNTHETIC DATA)", style="italic")
-axes[1].set_title("Precision-Recall Curves — PRIMARY METRIC\n(SYNTHETIC DATA)",
+# A precision-recall curve has no fixed chance line: a no-skill classifier sits
+# at y = prevalence, not at 0.5. Without this reference an AUC-PR of 0.64 reads
+# as mediocre when it is in fact roughly twice the no-skill floor.
+no_skill = float(y_test.mean())
+axes[1].axhline(no_skill, linestyle=":", color="0.35", linewidth=1.6,
+                 label=f"No-skill classifier (prevalence = {no_skill:.3f})")
+axes[1].legend(loc="upper right", fontsize=8)
+axes[1].set_ylim(0, 1)
+
+axes[0].set_title(f"ROC Curves\n({SOURCE_NOTE})", style="italic")
+axes[1].set_title(f"Precision-Recall Curves — PRIMARY METRIC\n({SOURCE_NOTE})",
                    style="italic")
 plt.tight_layout()
 plt.savefig(os.path.join(RESULTS_DIR, "roc_pr_curves.png"), dpi=150, bbox_inches="tight")
 plt.show()
 print("✅ ROC + PR curves saved → roc_pr_curves.png")
+print(f"   No-skill reference lines — AUC-ROC 0.500 | AUC-PR {no_skill:.4f} "
+      f"(prevalence) | Brier {no_skill * (1 - no_skill):.4f}")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -571,11 +655,12 @@ for label, pa, pb in comparisons:
 # (stats_validation.fairness_metrics)
 # ─────────────────────────────────────────────────────────────
 
-# Disaggregate by gender + programme, and by region when available (region is a
-# context variable, not a model predictor — pulled from raw_df by test index).
-fairness_cols = ["gender", "programme_type"]
-if "region" in raw_df.columns:
-    fairness_cols.append("region")
+# Disaggregate by whichever strata this cohort actually carries. The college
+# releases no demographics under its data protection rules, so programme and
+# cohort year are what remain. Any demographic column that appears later is
+# picked up automatically.
+fairness_cols = [c for c in ["programme", "cohort_year", "gender", "age_band", "region"]
+                 if c in raw_df.columns]
 test_groups = raw_df.loc[X_test.index, fairness_cols].reset_index(drop=True)
 xgb_test_labels = (xgb_proba >= 0.5).astype(int)
 y_test_arr = y_test.values
@@ -599,7 +684,7 @@ for gcol in fairness_cols:
 # (baseline_xgboost.run_ablation_study)
 # ─────────────────────────────────────────────────────────────
 ablation_df = baseline_xgboost.run_ablation_study(
-    X, y, ALL_NUMERIC, CATEGORICAL_COLS, ALL_FEATURES_V2, best_xgb_params, spw, SEED)
+    X, y, ALL_NUMERIC, CATEGORICAL_COLS, MODEL_FEATURES, best_xgb_params, spw, SEED)
 ablation_df.to_csv(os.path.join(RESULTS_DIR, "ablation_table.csv"), index=False)
 print(f"✅ Ablation study ({baseline_xgboost.N_CV_FOLDS}-fold CV AUC-PR):")
 print(ablation_df.to_string(index=False))

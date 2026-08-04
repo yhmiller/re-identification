@@ -1,0 +1,102 @@
+"""Single source of truth for the licensure-failure feature schema.
+
+Defines the raw column names the college supplies, the derived columns
+`engineer_features` adds, and the prediction target. Notebooks 00 and 01 import
+from here so the schema is defined once and cannot drift between them;
+notebook 02 inherits these names in-process via run_all.py.
+
+The educator app does not import this module. `engineer_features` is serialised
+by value into `results/<source>/inference_bundle.pkl` via
+`prediction.save_bundle()`, which calls
+`cloudpickle.register_pickle_by_value(schema)` at bundle-build time. That lets
+the app reproduce the exact training-time transform without this file on its
+path, so a retrained bundle changes the app's behaviour with no code edit.
+
+Feature design
+--------------
+The college's records are semester-level: per-semester GPA, credits, and letter
+grade counts. There are no per-subject continuous-assessment or mock scores, so
+the derived features apply the same averaging, consistency, minimum and
+weakness measures to the semester trajectory instead of to subject scores.
+
+To change the feature set, edit only this file.
+"""
+import numpy as np
+import pandas as pd
+
+N_SEMESTERS = 6
+SEMESTERS = list(range(1, N_SEMESTERS + 1))
+
+# A semester GPA below this counts as a weak semester. 2.0 is the college's own
+# progression threshold, so a student under it was already at academic risk.
+WEAK_GPA_THRESHOLD = 2.0
+
+GPA_COLS = [f"gpa_sem{i}" for i in SEMESTERS]
+GRADE_LETTERS = list("ABCDE")
+GRADE_COUNT_COLS = [f"n_grade_{g}" for g in GRADE_LETTERS]
+
+# Grades A to D are passes; E is a fail. The college records no F.
+PASS_LETTERS = set("ABCD")
+FAIL_LETTERS = set("E")
+
+# Raw columns as supplied by the college registry.
+NUMERIC_COLS = ["cgpa", "total_credits"] + GPA_COLS + ["n_courses"] + GRADE_COUNT_COLS
+
+# Programme now varies across the cohort (Environmental Health, Occupational
+# Health and Safety, Occupational Therapy), so unlike the single-programme
+# extraction it carries signal and is a predictor.
+CATEGORICAL_COLS = ["programme"]
+
+# cohort_year is context only: it drives the temporal split and is never a
+# predictor, since a model keyed on year cannot generalise to a new cohort.
+CONTEXT_COLS = ["cohort_year", "student_id"]
+
+ALL_FEATURES = NUMERIC_COLS + CATEGORICAL_COLS
+
+TARGET = "fail"  # 1 = failed the licensure examination at first attempt
+
+
+def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Add derived features, all computable before the licensure examination.
+
+    Restricting inputs to pre-examination academic records is what keeps the
+    model free of target leakage.
+    """
+    df = df.copy()
+    gpas = df[GPA_COLS]
+
+    df["gpa_mean"] = gpas.mean(axis=1)
+    df["gpa_min"] = gpas.min(axis=1)
+    df["gpa_max"] = gpas.max(axis=1)
+
+    # Low spread means a steady student; a high spread means one who swings.
+    df["gpa_consistency"] = gpas.std(axis=1)
+
+    # Positive trend means the student was improving into their final year,
+    # which matters more than the average for a candidate sitting soon.
+    df["gpa_trend"] = df[GPA_COLS[-1]] - df[GPA_COLS[0]]
+    df["gpa_final_half"] = df[GPA_COLS[3:]].mean(axis=1)
+    df["gpa_first_half"] = df[GPA_COLS[:3]].mean(axis=1)
+
+    for i in SEMESTERS:
+        df[f"weak_sem{i}"] = (df[f"gpa_sem{i}"] < WEAK_GPA_THRESHOLD).astype(int)
+    df["n_weak_semesters"] = df[[f"weak_sem{i}" for i in SEMESTERS]].sum(axis=1)
+
+    df["n_failed"] = df["n_grade_E"]
+    n_courses = df["n_courses"].replace(0, np.nan)
+    df["fail_rate"] = df["n_failed"] / n_courses
+    for g in GRADE_LETTERS:
+        df[f"prop_grade_{g}"] = df[f"n_grade_{g}"] / n_courses
+
+    return df
+
+
+ENGINEERED_NUMERIC = [
+    "gpa_mean", "gpa_min", "gpa_max", "gpa_consistency",
+    "gpa_trend", "gpa_final_half", "gpa_first_half",
+    "n_weak_semesters", "n_failed", "fail_rate",
+] + [f"weak_sem{i}" for i in SEMESTERS] \
+  + [f"prop_grade_{g}" for g in GRADE_LETTERS]
+
+ALL_NUMERIC = NUMERIC_COLS + ENGINEERED_NUMERIC
+ALL_FEATURES_V2 = ALL_NUMERIC + CATEGORICAL_COLS

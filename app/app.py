@@ -1,5 +1,5 @@
 """
-app.py — NMC-LE risk screening for nurse educators.
+app.py — licensure risk screening for allied health tutors.
 
 Upload a spreadsheet of student records, get a ranked at-risk list with a
 per-student explanation of why the model flagged them.
@@ -22,7 +22,7 @@ DEFAULT_THRESHOLD = 0.50
 PROB_PERCENT_FORMAT = "{:.0%}"
 
 # ── Project / authorship metadata (shown in the About modal + bylines) ──
-APP_TITLE = "NMC-LE Risk Screening"
+APP_TITLE = "Licensure Risk Screening"
 RESEARCHER = "Prince Bortey Miller"
 # RESEARCHER_ID = "22388461"
 RESEARCHER_EMAIL = "prince@princemiller.com"
@@ -33,10 +33,12 @@ PROGRAMME = "MSc Health Informatics, 2025-2026"
 
 ABOUT_MD = f"""### {APP_TITLE}
 
-Explainable machine learning for predicting **Nursing & Midwifery Council
-Licensure Examination (NMC-LE)** failure in Ghana - an **XGBoost + SHAP**
-approach. It screens nursing trainees for first-attempt failure risk so
-educators can target remediation early. Decision support only - not a verdict.
+Explainable machine learning for predicting **health professions licensure
+examination** failure in Ghana - an **XGBoost + SHAP** approach. Built on
+Accra School of Hygiene records across Environmental Health, Occupational
+Health and Safety, and Occupational Therapy. It screens trainees for
+first-attempt failure risk so tutors can target remediation early.
+Decision support only - not a verdict.
 
 **Researcher:** {RESEARCHER}
 
@@ -75,9 +77,9 @@ def read_upload(uploaded_file):
 
 
 def render_header():
-    st.title("NMC-LE Risk Screening")
+    st.title("Licensure Risk Screening")
     st.caption(
-        "Identify nursing trainees at risk of failing the licensure exam, "
+        "Identify trainees at risk of failing the licensure examination, "
         "so remediation can start early. Predictions are model estimates, not "
         "verdicts - use them alongside your own judgement."
     )

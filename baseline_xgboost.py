@@ -14,6 +14,7 @@ import pandas as pd
 import lightgbm as lgb
 import xgboost as xgb
 from sklearn.base import clone
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
@@ -21,7 +22,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
-from sklearn.metrics import average_precision_score, roc_auc_score
+from sklearn.metrics import (average_precision_score, brier_score_loss,
+                              roc_auc_score)
 
 from stats_validation import evaluate_model
 
@@ -38,6 +40,18 @@ from stats_validation import evaluate_model
 # from more folds. 5-fold trades a touch more bias for meaningfully less
 # variance, which matters more at this sample size.
 N_CV_FOLDS = 5
+
+# The baseline-vs-engineered comparison repeats the whole 5-fold split under
+# this many seeds, giving N_CV_FOLDS * N_CV_REPEATS paired observations.
+#
+# Five folds alone cannot support the claim. The smallest two-sided p the
+# Wilcoxon signed-rank test can return at n=5 is 2/2**5 = 0.0625, which occurs
+# only when every fold favours the same model, so significance at alpha=0.05 is
+# unreachable no matter how large the effect. At 25 paired folds the floor drops
+# below 1e-7. Repeating the split rather than raising the fold count keeps each
+# test fold the same size, which matters because the real cohort is small and
+# 10 folds would leave too few failures per fold for a stable AUC-PR.
+N_CV_REPEATS = 5
 
 XGB_PARAM_GRID = {
     "max_depth": [3, 6],
@@ -201,6 +215,35 @@ def temporal_validation(raw_df, X, y, preprocessor, best_params, spw, seed):
     }])
 
 
+def calibrate(fitted_model, X_val, y_val, X_test, y_test, method="isotonic"):
+    """Fit a probability calibrator on the validation fold and score the test set.
+
+    A raw XGBoost score ranks well but is not a probability, so the app's "68%
+    risk" is not trustworthy without this step. Calibration is fitted on the
+    held-out validation fold, never on training or test data, and it cannot
+    change the ranking, so AUC-ROC and AUC-PR are unaffected by construction.
+    Only the Brier score and the reliability curve move.
+
+    `method` is "isotonic" (non-parametric, needs a few hundred points) or
+    "sigmoid" (Platt scaling, safer on small validation folds).
+    """
+    calibrator = CalibratedClassifierCV(fitted_model, method=method, cv="prefit")
+    calibrator.fit(X_val, y_val)
+    proba = calibrator.predict_proba(X_test)[:, 1]
+
+    prevalence = float(y_test.mean())
+    brier_no_skill = prevalence * (1 - prevalence)
+    brier = brier_score_loss(y_test, proba)
+    return calibrator, {
+        "method": method,
+        "brier": round(brier, 4),
+        "brier_no_skill": round(brier_no_skill, 4),
+        "brier_skill_score": round(1 - brier / brier_no_skill, 4),
+        "auc_roc": round(roc_auc_score(y_test, proba), 4),
+        "auc_pr": round(average_precision_score(y_test, proba), 4),
+    }, proba
+
+
 def ablation_auc_pr(feature_subset, X, y, all_numeric, categorical_cols,
                      best_params, spw, seed):
     """N_CV_FOLDS-fold CV mean/std AUC-PR for one feature subset (no leakage). (was CELL 18.5)"""
@@ -235,15 +278,23 @@ def ablation_auc_pr(feature_subset, X, y, all_numeric, categorical_cols,
 def run_ablation_study(X, y, all_numeric, categorical_cols, all_features,
                         best_params, spw, seed):
     """Run the fixed set of ablation variants and return a results table."""
-    # "No demographics" answers whether age_band/gender earn their place as
-    # predictors, or whether the academic indicators alone perform as well.
+    # Each variant isolates one block of the feature set. "CGPA only" is the
+    # floor: if the full model cannot beat a single cumulative average, the
+    # semester detail and grade distribution are not earning their place.
+    def without(*fragments):
+        return [f for f in all_features
+                if not any(frag in f for frag in fragments)]
+
     variants = {
         "All features": all_features,
-        "CGPA only": ["programme_cgpa"],
-        "No mock scores": [f for f in all_features if "mock" not in f],
-        "No demographics": [f for f in all_features
-                             if f not in ("age_band", "gender")],
+        "CGPA only": [f for f in all_features if f == "cgpa"],
+        "No semester trajectory": without("gpa_sem", "weak_sem", "gpa_trend",
+                                           "gpa_consistency", "gpa_first_half",
+                                           "gpa_final_half"),
+        "No grade distribution": without("n_grade_", "prop_grade_",
+                                          "n_failed", "fail_rate"),
     }
+    variants = {name: feats for name, feats in variants.items() if feats}
     rows = []
     for name, feats in variants.items():
         mean_pr, std_pr = ablation_auc_pr(feats, X, y, all_numeric, categorical_cols,

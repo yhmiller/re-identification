@@ -1,11 +1,24 @@
 # ============================================================
 # 00_data_preparation_and_eda.py
 # STAGE 0 — Raw college records → anonymised, model-ready CSV
-#           + Exploratory Data Analysis for the thesis
 #
-# Run this FIRST when the college hands you the raw data file.
-# Output: anonymised_records.csv  → loaded by Cell 6 of
-#         01_pipeline_and_experiments.py
+# SUPERSEDED for the Accra School of Hygiene extraction.
+#
+# This stage was written for a single raw spreadsheet with one row per student
+# and named columns to map. The college instead released six per-programme
+# workbooks of semester grade matrices, so preparation now runs as two scripts:
+#
+#     ml_env/bin/python scripts/consolidate_real_data.py    # workbooks -> tidy
+#     ml_env/bin/python scripts/build_model_dataset.py      # tidy -> model-ready
+#
+# Those handle identifier generation, exclusions and the data-quality report.
+# Stage 1 then reads the result through real_data.load().
+#
+# This file is retained because a future delivery in the original one-row-per-
+# student format would use it, and because its exclusion and SHA-256
+# anonymisation logic documents the approved protocol. It is NOT part of the
+# run_all.py chain and its schema imports are pinned to the retired subject-
+# score feature set below.
 #
 # Author : Prince Bortey Miller | ID: 22388461 | KNUST
 # Ethics : HuSSREC, KNUST — anonymisation per approved protocol
@@ -90,7 +103,13 @@ try:
 except NameError:
     pass  # __file__ is undefined in a pasted Colab cell — rely on the cwd
 
-from nmcle_schema import NMC_SUBJECTS, CA_COLS, MOCK_COLS
+# Pinned locally rather than imported: schema.py now describes the semester-GPA
+# feature set the college actually released, while this stage still documents
+# the subject-score format it was written for. See the header note.
+NMC_SUBJECTS = ["medical_surgical", "mental_health", "paediatric",
+                "public_health", "obstetric", "pharmacology"]
+CA_COLS = [f"ca_{s}" for s in NMC_SUBJECTS]
+MOCK_COLS = [f"mock_{s}" for s in NMC_SUBJECTS]
 
 print("✅ Config set. Edit COLUMN_MAPPING after inspecting the real file.")
 

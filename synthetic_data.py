@@ -21,64 +21,71 @@ from sdv.single_table import GaussianCopulaSynthesizer
 from sdv.metadata import SingleTableMetadata
 
 
-def build_schema_dataframe(ca_cols, mock_cols, nmc_subjects, target, seed, n=20):
-    """
-    A tiny hand-crafted reference table that tells SDV the realistic
-    distribution of each column, for pilot (non-real) data only.
-    (was 01_pipeline_and_experiments.py CELL 4's build_schema_dataframe)
+PROGRAMMES = ["EH", "OHS", "OT"]
+GRADE_LETTERS = list("ABCDE")
+
+# Observed in the Accra School of Hygiene 2021 and 2022 extraction (n = 110).
+# The pilot generator matches these so a pipeline-testing run behaves like the
+# real corpus rather than like an arbitrary distribution.
+REAL_CGPA_MEAN, REAL_CGPA_SD = 2.63, 0.67
+REAL_COURSES_MEAN, REAL_COURSES_SD = 46, 6
+REAL_GRADE_MIX = [0.305, 0.218, 0.311, 0.156, 0.010]
+
+
+def build_schema_dataframe(gpa_cols, grade_count_cols, target, seed, n=20):
+    """A small reference table describing each column's realistic distribution.
+
+    SDV learns the joint distribution from this table, so it only has to be
+    representative in shape, not large. Pilot (non-real) data only.
     """
     rng = np.random.default_rng(seed)
-
     df = pd.DataFrame()
-    df["wassce_aggregate"] = rng.integers(6, 36, n).astype(float)
-    df["programme_cgpa"] = np.clip(rng.normal(2.8, 0.6, n), 1.0, 4.0)
 
-    for col in ca_cols:
-        df[col] = np.clip(rng.normal(62, 12, n), 20, 100)
-    for col in mock_cols:
-        df[col] = np.clip(rng.normal(58, 15, n), 10, 100)
+    # A latent ability per student keeps the semester GPAs correlated with each
+    # other and with CGPA, which an independent draw per column would not.
+    ability = np.clip(rng.normal(REAL_CGPA_MEAN, REAL_CGPA_SD, n), 0.4, 4.0)
+    for i, col in enumerate(gpa_cols):
+        drift = 0.05 * i  # students tend to improve slightly across the programme
+        df[col] = np.clip(ability + drift + rng.normal(0, 0.45, n), 0.0, 4.0)
 
-    df["programme_type"] = rng.choice(["RGN", "RM", "NAC", "NAP"],
-                                       n, p=[0.55, 0.25, 0.12, 0.08])
-    df["age_band"] = rng.choice(["Below 20", "20-24", "25-29", "30+"],
-                                 n, p=[0.10, 0.55, 0.25, 0.10])
-    df["gender"] = rng.choice(["Female", "Male"], n, p=[0.72, 0.28])
+    df["cgpa"] = np.clip(df[gpa_cols].mean(axis=1) + rng.normal(0, 0.08, n), 0.0, 4.0)
+    df["total_credits"] = np.clip(rng.normal(115, 10, n), 80, 160).round()
+    df["n_courses"] = np.clip(
+        rng.normal(REAL_COURSES_MEAN, REAL_COURSES_SD, n), 25, 55).round()
 
-    # Context columns — NOT model predictors. region drives fairness
-    # disaggregation; cohort_year drives the temporal split.
-    df["region"] = rng.choice(
-        ["Ashanti", "Greater Accra", "Eastern", "Central",
-         "Western", "Brong-Ahafo", "Northern", "Other"],
-        n, p=[0.22, 0.18, 0.12, 0.10, 0.10, 0.08, 0.10, 0.10])
-    df["cohort_year"] = rng.choice([2021, 2022, 2023, 2024], n)
+    # Grade counts must sum to n_courses, and stronger students earn more A/B.
+    for j, col in enumerate(grade_count_cols):
+        tilt = (ability - REAL_CGPA_MEAN) / REAL_CGPA_SD * (1.5 - j) * 0.05
+        share = np.clip(REAL_GRADE_MIX[j] + tilt, 0.001, None)
+        df[col] = share
+    shares = df[grade_count_cols].div(df[grade_count_cols].sum(axis=1), axis=0)
+    for col in grade_count_cols:
+        df[col] = (shares[col] * df["n_courses"]).round()
 
-    # Target: loosely correlated with CGPA and mock performance. Centered on
-    # its own mean so the synthetic fail rate lands near 50% (the national
-    # NMC-LE first-attempt rate) instead of collapsing to all-Pass.
-    linear = (-0.5 * df["programme_cgpa"]
-              - 0.02 * df[[f"mock_{s}" for s in nmc_subjects]].mean(axis=1))
+    df["programme"] = rng.choice(PROGRAMMES, n, p=[0.45, 0.40, 0.15])
+    df["cohort_year"] = rng.choice([2021, 2022], n)
+
+    # Target: weaker and less consistent students fail more often. Centred on
+    # its own mean so the pilot fail rate lands near the middle rather than
+    # collapsing to all-pass.
+    linear = -1.4 * ability + 0.6 * df[gpa_cols].std(axis=1)
     logit = (linear - linear.mean()) + rng.normal(0, 0.5, n)
-    prob_fail = 1 / (1 + np.exp(-logit))
-    df[target] = prob_fail > 0.5   # boolean, to match the SDV metadata sdtype
+    df[target] = (1 / (1 + np.exp(-logit))) > 0.5
     return df
 
 
-def generate_pilot_data(ca_cols, mock_cols, nmc_subjects, target, seed,
+def generate_pilot_data(gpa_cols, grade_count_cols, target, seed,
                          n_reference=30, n_rows=1000):
+    """Sample pilot records from a synthesiser fitted on the reference table.
+
+    PIPELINE TESTING ONLY. Never used for training or evaluation results.
     """
-    Fit a GaussianCopulaSynthesizer on the hand-crafted reference table and
-    sample `n_rows` pilot records. PIPELINE TESTING ONLY — never used for
-    training or evaluation results.
-    """
-    schema_df = build_schema_dataframe(ca_cols, mock_cols, nmc_subjects, target,
+    schema_df = build_schema_dataframe(gpa_cols, grade_count_cols, target,
                                         seed, n=n_reference)
 
     metadata = SingleTableMetadata()
     metadata.detect_from_dataframe(schema_df)
-    metadata.update_column("programme_type", sdtype="categorical")
-    metadata.update_column("age_band", sdtype="categorical")
-    metadata.update_column("gender", sdtype="categorical")
-    metadata.update_column("region", sdtype="categorical")
+    metadata.update_column("programme", sdtype="categorical")
     metadata.update_column("cohort_year", sdtype="categorical")
     metadata.update_column(target, sdtype="boolean")
 
@@ -88,6 +95,9 @@ def generate_pilot_data(ca_cols, mock_cols, nmc_subjects, target, seed,
     syn_df = synthesiser.sample(num_rows=n_rows)
     syn_df[target] = syn_df[target].astype(int)
     syn_df["cohort_year"] = syn_df["cohort_year"].astype(int)
+    # Grade counts are resampled independently by the copula, so restore the
+    # invariant the downstream proportion features depend on.
+    syn_df["n_courses"] = syn_df[grade_count_cols].sum(axis=1)
     return syn_df
 
 

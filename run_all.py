@@ -233,7 +233,7 @@ def main():
     # root regardless of where the runner was invoked from.
     os.chdir(REPO_ROOT)
 
-    # Make nmcle_schema.py (the shared feature schema) importable from the
+    # Make schema.py (the shared feature schema) importable from the
     # notebooks, which runpy executes with notebooks/ — not the repo root — as
     # sys.path[0].
     if str(REPO_ROOT) not in sys.path:

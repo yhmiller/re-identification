@@ -98,6 +98,43 @@ NOTE: If Δ (Delta) is positive and p < 0.05 → report as a significant improve
 """
 
 
+def fold_confidence_interval(values, level=0.95, n_boot=10000, seed=42):
+    """Bootstrap CI for the mean of a set of per-fold metric values.
+
+    Reporting mean +/- SD describes the spread of the folds; it does not say how
+    precisely the mean itself is estimated, which is what a reader needs in
+    order to judge whether two models differ. The CAN-DO guidance is explicit
+    that a Q1 reviewer will ask for this regardless.
+
+    Percentile bootstrap is used rather than a normal approximation because
+    per-fold AUC values are bounded and skew near the ceiling, so a symmetric
+    interval can run past 1.0.
+    """
+    values = np.asarray(values, dtype=float)
+    rng = np.random.default_rng(seed)
+    means = rng.choice(values, size=(n_boot, len(values)), replace=True).mean(axis=1)
+    lo, hi = np.percentile(means, [100 * (1 - level) / 2, 100 * (1 + level) / 2])
+    return float(values.mean()), float(lo), float(hi)
+
+
+def summarise_with_ci(results, metrics=("auc_roc", "auc_pr", "acc", "f1"), level=0.95):
+    """One row per metric: mean, SD across folds, and a bootstrap CI on the mean."""
+    rows = []
+    for m in metrics:
+        if m not in results:
+            continue
+        mean, lo, hi = fold_confidence_interval(results[m], level=level)
+        rows.append({
+            "Metric": METRIC_NAMES.get(m, m),
+            "Mean": round(mean, 4),
+            "SD across folds": round(float(np.std(results[m])), 4),
+            f"{int(level*100)}% CI lower": round(lo, 4),
+            f"{int(level*100)}% CI upper": round(hi, 4),
+            "CI width": round(hi - lo, 4),
+        })
+    return pd.DataFrame(rows)
+
+
 def compare_real_vs_synthetic(real_results, synthetic_results, metrics=("auc_roc", "auc_pr")):
     """
     Option 2 (framework/pipeline replication): compare the SAME pipeline's

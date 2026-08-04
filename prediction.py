@@ -28,13 +28,13 @@ STUDENT_ID_COLUMN = "student_id"
 
 def save_bundle(bundle: dict, path):
     """
-    cloudpickle-dump an inference bundle, registering nmcle_schema for
+    cloudpickle-dump an inference bundle, registering schema for
     BY-VALUE serialisation first so the bundle stays self-contained (the app
-    then reproduces the training-time transform without nmcle_schema.py on
+    then reproduces the training-time transform without schema.py on
     its path — see load_bundle's docstring for why cloudpickle, not pickle).
     """
-    import nmcle_schema
-    cloudpickle.register_pickle_by_value(nmcle_schema)
+    import schema
+    cloudpickle.register_pickle_by_value(schema)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with open(path, "wb") as f:
         cloudpickle.dump(bundle, f)
