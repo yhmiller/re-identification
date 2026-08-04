@@ -9,7 +9,7 @@
 # those modules so it is reusable and independently testable — see
 # docs/TODO.md, "Codebase restructure: extract core logic into modules".
 #
-# Project : Explainable ML for Predicting NMC-LE Failure in Ghana
+# Project : Explainable ML for Predicting AHPC-LE Failure in Ghana
 # Author  : Prince Bortey Miller | ID: 22388461 | KNUST
 # Supervisor: Dr. Eric Opoku Osei
 # ============================================================
@@ -81,14 +81,14 @@ print("   XGBoost:", xgb.__version__,
 
 
 # ─────────────────────────────────────────────────────────────
-# CELL 3 — Column schema (single source of truth: nmcle_schema.py)
+# CELL 3 — Column schema (single source of truth: schema.py)
 # The schema, engineered-column lists, and engineer_features all live in
-# nmcle_schema.py at the repo root, so subjects/columns never drift between
+# schema.py at the repo root, so subjects/columns never drift between
 # notebooks. To change the exam papers or feature set, edit ONLY that file.
 #
 # run_all.py puts the repo root on sys.path. The block below also finds it for a
 # direct `python notebooks/01_...py` run. In Colab, clone the repo and run from
-# inside it so nmcle_schema.py sits on the path.
+# inside it so schema.py sits on the path.
 # ─────────────────────────────────────────────────────────────
 import sys
 
@@ -148,7 +148,7 @@ print(syn_df[["cgpa", "gpa_sem1", "gpa_sem6", "n_courses",
 # ─────────────────────────────────────────────────────────────
 # CELL 5 — Feature engineering
 # engineer_features() and the engineered-column lists are defined in
-# nmcle_schema.py (imported in CELL 3). This cell just applies them.
+# schema.py (imported in CELL 3). This cell just applies them.
 # ─────────────────────────────────────────────────────────────
 
 # Apply to synthetic data
@@ -177,6 +177,12 @@ FORCE_PILOT = False
 # overwrite a real one.
 ALPHA_CORPUS = os.environ.get("ALPHA_CORPUS")
 
+# Optional override that keeps the REAL academic records but supplies a
+# simulated licensure outcome from a registrar-format return workbook. Results
+# land in their own per-prevalence directory and every caption is labelled, so
+# a simulated run can never be mistaken for or overwrite a real one.
+SYNTHETIC_OUTCOMES = os.environ.get("SYNTHETIC_OUTCOMES")
+
 flow = real_data.summarise()
 print(f"ℹ️  College dataset: {flow['records_total']} records | "
       f"outcomes supplied {flow['outcomes_supplied']} | "
@@ -187,6 +193,35 @@ if ALPHA_CORPUS:
     DATA_SOURCE = "synthetic_alpha"
     print(f"⚠️  SIMULATED ALPHA CORPUS: {len(raw_df)} rows from {ALPHA_CORPUS}")
     print("⚠️  Outcomes here are GENERATED. Nothing from this run is reportable.")
+elif SYNTHETIC_OUTCOMES:
+    raw_df = real_data.load(outcomes_from=SYNTHETIC_OUTCOMES)
+    provenance = raw_df.attrs.get("outcome_provenance", "UNKNOWN")
+    prevalence = raw_df.attrs.get("outcome_prevalence", float("nan"))
+    if provenance == real_data.REGISTRAR_PROVENANCE:
+        # The registrar's genuine return carries OBSERVED outcomes, so it must
+        # not land in a real_synthetic_outcome_pNNN/ directory: that NNN is an
+        # assumed prevalence, and these outcomes are measured, not assumed.
+        DATA_SOURCE = "real"
+        print(f"✅ REGISTRAR RETURN: {len(raw_df)} students with OBSERVED outcomes "
+              f"from {SYNTHETIC_OUTCOMES}")
+        print(f"   Observed failure rate: {raw_df[TARGET].mean():.3f} (measured, not assumed).")
+    elif pd.isna(prevalence):
+        # Failing here rather than defaulting: a guessed prevalence would name
+        # the results directory after a number nothing in the run supports.
+        raise ValueError(
+            f"{SYNTHETIC_OUTCOMES} declares record_type '{provenance}' but its "
+            f"'{real_data.PROVENANCE_SHEET}' sheet supplies no usable "
+            "'prevalence' field. A simulated run is filed under "
+            "results/real_synthetic_outcome_pNNN/ and NNN comes from that "
+            "field, so it cannot be defaulted without mislabelling the "
+            "directory. Either add the prevalence to the workbook, or supply "
+            "the registrar's genuine return, which needs no provenance sheet "
+            "and runs as observed data.")
+    else:
+        DATA_SOURCE = f"real_synthetic_outcome_p{int(round(prevalence * 1000)):03d}"
+        print(f"⚠️  REAL academic records with SIMULATED outcomes: {len(raw_df)} students")
+        print(f"⚠️  Prevalence {prevalence} is an ASSUMPTION — no AHPC pass rate is published.")
+        print("⚠️  Outcomes here are GENERATED. Nothing from this run is reportable.")
 elif FORCE_PILOT:
     raw_df, DATA_SOURCE = syn_df.copy(), "synthetic"
     print("ℹ️  FORCE_PILOT set — using pilot data.")
@@ -203,10 +238,14 @@ else:
 # Figure captions derive their data-source label from DATA_SOURCE rather than
 # hardcoding it, so a real-data run cannot silently ship plots captioned
 # "SYNTHETIC DATA".
-SOURCE_NOTE = {
-    "synthetic":       "SYNTHETIC DATA — pipeline testing only",
-    "synthetic_alpha": "SIMULATED ALPHA CORPUS — generated outcomes, not reportable",
-}.get(DATA_SOURCE, "Institutional cohort")
+if DATA_SOURCE.startswith("real_synthetic_outcome"):
+    SOURCE_NOTE = (f"Real academic records, SIMULATED outcomes "
+                   f"(prevalence {raw_df.attrs.get('outcome_prevalence')}) — not reportable")
+else:
+    SOURCE_NOTE = {
+        "synthetic":       "SYNTHETIC DATA — pipeline testing only",
+        "synthetic_alpha": "SIMULATED ALPHA CORPUS — generated outcomes, not reportable",
+    }.get(DATA_SOURCE, "Institutional cohort")
 
 # Results land in results/<DATA_SOURCE>/ so a real run and a synthetic run
 # never overwrite each other's artefacts (see docs/TODO.md, "Performance
@@ -472,7 +511,7 @@ shap.summary_plot(shap_values, X_test_proc,
                   feature_names=FEATURE_NAMES,
                   plot_type="violin",
                   show=False)
-plt.title("Global SHAP Feature Importance — NMC-LE Failure Prediction\n"
+plt.title("Global SHAP Feature Importance — AHPC-LE Failure Prediction\n"
           f"({SOURCE_NOTE})",
           fontsize=11, style="italic")
 plt.tight_layout()
@@ -696,7 +735,7 @@ print("   Saved → " + RESULTS_DIR + "/ablation_table.csv")
 # ─────────────────────────────────────────────────────────────
 
 config = f"""# config.yaml
-# XGBoost hyperparameters — NMC-LE failure prediction
+# XGBoost hyperparameters — AHPC-LE failure prediction
 # Author: Prince Bortey Miller | KNUST 2026
 
 model:

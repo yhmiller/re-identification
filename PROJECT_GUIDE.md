@@ -40,7 +40,7 @@ ml_env/bin/python scripts/build_model_dataset.py     # tidy -> model-ready
 ./run.sh                                             # Stage 1 + Stage 2
 ```
 
-The pipeline detects the outcome column automatically. While `nmcle_fail` in
+The pipeline detects the outcome column automatically. While `licensure_fail` in
 `data/model_dataset_2021_2022.xlsx` is empty it runs on pilot data and writes
 to `results/synthetic/`; once the college populates it, the same command trains
 on real records and writes to `results/real/`. No flags, no edits.

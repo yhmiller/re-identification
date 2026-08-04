@@ -9,6 +9,12 @@ instead of failing on undefined names.
 
 Usage:
     ml_env/bin/python run_all.py [--verbose / -v]
+    ml_env/bin/python run_all.py --synthetic-outcomes [PATH]
+        Run on the REAL academic records with a SIMULATED licensure outcome
+        from a registrar-format return workbook. Bare (no PATH) defaults to
+        the primary prevalence-0.40 workbook. Results are labelled and
+        isolated in results/real_synthetic_outcome_p<prevalence>/ — see
+        notebooks/01_pipeline_and_experiments.py, CELL 6.
 
 Everything is written to results/. Stage 0 (raw-data anonymisation + EDA)
 is run separately, only when the college delivers real data — see PROJECT_GUIDE.
@@ -28,6 +34,8 @@ NOTEBOOKS = REPO_ROOT / "notebooks"
 STAGE_1 = NOTEBOOKS / "01_pipeline_and_experiments.py"
 STAGE_2 = NOTEBOOKS / "02_model_engineering.py"
 RUN_MANIFEST = REPO_ROOT / "results" / "run_manifest.csv"
+# Default workbook for a bare `--synthetic-outcomes` (no path given).
+SYNTHETIC_OUTCOMES_DEFAULT = REPO_ROOT / "data" / "OUTCOME_REQUEST_2021_2022_SYNTHETIC_RETURN_p400.xlsx"
 MANIFEST_FIELDS = ["timestamp", "git_commit", "data_source", "model",
                     "n_features", "auc_roc", "auc_pr", "f1_weighted",
                     "precision", "recall", "brier"]
@@ -58,6 +66,20 @@ def is_progress_marker(stripped):
 
 def is_headline_metric(line):
     return "±" in line and ("AUC-ROC:" in line or "AUC-PR" in line)
+
+
+def synthetic_outcomes_arg():
+    """
+    Return the return-workbook path for --synthetic-outcomes, or None if the
+    flag was not passed. Bare `--synthetic-outcomes` (nothing follows it, or
+    the next token is itself a flag) resolves to SYNTHETIC_OUTCOMES_DEFAULT;
+    `--synthetic-outcomes <PATH>` uses the given path.
+    """
+    if "--synthetic-outcomes" not in sys.argv:
+        return None
+    idx = sys.argv.index("--synthetic-outcomes")
+    has_path = idx + 1 < len(sys.argv) and not sys.argv[idx + 1].startswith("-")
+    return sys.argv[idx + 1] if has_path else str(SYNTHETIC_OUTCOMES_DEFAULT)
 
 
 class CleanStdoutWrapper:
@@ -240,6 +262,18 @@ def main():
         sys.path.insert(0, str(REPO_ROOT))
 
     verbose = "--verbose" in sys.argv or "-v" in sys.argv
+
+    # Run on the REAL academic records with a SIMULATED licensure outcome
+    # from a registrar-format return workbook, instead of the default real/
+    # pilot-data selection in notebook 01, CELL 6. Read by the notebook via
+    # os.environ["SYNTHETIC_OUTCOMES"]; resolved against REPO_ROOT because
+    # main() has already chdir'd there, so a relative PATH still works.
+    synthetic_outcomes = synthetic_outcomes_arg()
+    if synthetic_outcomes:
+        synthetic_outcomes_path = Path(synthetic_outcomes)
+        if not synthetic_outcomes_path.is_absolute():
+            synthetic_outcomes_path = REPO_ROOT / synthetic_outcomes_path
+        os.environ["SYNTHETIC_OUTCOMES"] = str(synthetic_outcomes_path)
 
     if not verbose:
         os.makedirs("results", exist_ok=True)

@@ -12,6 +12,26 @@ Kwame Nkrumah University of Science and Technology (KNUST), Ghana
 
 ---
 
+## Examining body
+
+This study's cohort (Environmental Health, Occupational Health & Safety, and
+Occupational Therapy at the Accra School of Hygiene) sits the **Allied Health
+Professions Council** licensure examination under the Health Professions
+Regulatory Bodies Act, 2013 (Act 857) — **not** the Nursing and Midwifery
+Council examination.
+
+| | NMC-LE (nursing) | AHPC-LE (this study) |
+|---|---|---|
+| Pass mark | 50% | **60%** |
+| Sat after | Completion of training | **Internship / national service** |
+| Published pass rates | Cited in the literature | **Pass lists only, no denominator** |
+
+Ghanaian nursing licensure studies (Amankwaa et al. 2015 and others) are cited
+as **adjacent-profession** evidence for which predictors matter, never as a
+source for the failure prevalence.
+
+---
+
 ## Overview
 
 Failing a health professions licensure examination at first attempt delays a
@@ -27,7 +47,7 @@ Therapy, cohorts 2021 and 2022. These are allied health professions regulated
 by Ghana's Allied Health Professions Council.
 
 E-XGBoost is a modified version of XGBoost in which the predictor set is the
-only altered component: train a baseline on all 36 predictors, rank inputs by
+only altered component: train a baseline on all 35 predictors, rank inputs by
 mean absolute SHAP value, keep the smallest subset explaining 95% of total
 attribution, then retrain on identical folds and hyperparameters. Because
 nothing else changes, any difference in performance is attributable to the
@@ -65,11 +85,17 @@ per-student SHAP explanations. No coding required.
 Feature selection is nested inside every fold, so the ranking model never sees
 held-out labels. 5 folds x 5 repeats = 25 paired observations.
 
+> **Superseded numbers.** The table below was produced before semester GPAs
+> became credit-weighted and before `gpa_mean` was dropped, so its 36-predictor
+> baseline no longer matches the 35-predictor schema the code has today. It is
+> left here as a record of the pipeline's behaviour, not as a current
+> measurement. Re-run the pipeline to regenerate it.
+
 | Model | Features | AUC-ROC | AUC-PR | Wilcoxon p | Cohen's d |
 |---|---|---|---|---|---|
 | No-skill reference | n/a | 0.5000 | 0.3467 | n/a | n/a |
-| Baseline XGBoost | 36 | 0.8377 +/- 0.0307 | 0.7447 +/- 0.0481 | n/a | n/a |
-| E-XGBoost (nested) | 21 | 0.8372 +/- 0.0305 | 0.7458 +/- 0.0430 | 0.895 | +0.074 |
+| Baseline XGBoost | 36 (superseded) | 0.8377 +/- 0.0307 | 0.7447 +/- 0.0481 | n/a | n/a |
+| E-XGBoost (nested) | 21 (superseded) | 0.8372 +/- 0.0305 | 0.7458 +/- 0.0430 | 0.895 | +0.074 |
 
 **The honest verdict is equivalence, not improvement.** E-XGBoost matches the
 baseline while using 15 fewer predictors. Every effect size is negligible and
@@ -94,7 +120,7 @@ Brier skill +0.280 to +0.337, AUC unchanged.
 
 ---
 
-## Feature schema (36 predictors)
+## Feature schema (35 predictors)
 
 All predictors are available **before** the trainee sits the examination, which
 is what keeps the model free of target leakage. Defined once in
@@ -103,8 +129,13 @@ is what keeps the model free of target leakage. Defined once in
 | Group | Count | Columns |
 |---|---|---|
 | Raw | 14 | `cgpa`, `total_credits`, `gpa_sem1..6`, `n_courses`, `n_grade_A..E` |
-| Engineered | 21 | `gpa_mean/min/max`, `gpa_consistency`, `gpa_trend`, `gpa_first_half`, `gpa_final_half`, `weak_sem1..6`, `n_weak_semesters`, `n_failed`, `fail_rate`, `prop_grade_A..E` |
+| Engineered | 20 | `gpa_min/max`, `gpa_consistency`, `gpa_trend`, `gpa_first_half`, `gpa_final_half`, `weak_sem1..6`, `n_weak_semesters`, `n_failed`, `fail_rate`, `prop_grade_A..E` |
 | Categorical | 1 | `programme` (EH, OHS, OT) |
+
+`gpa_mean` was dropped once semester GPAs became credit-weighted: the weighting
+made it numerically identical to `cgpa` (correlation 1.000000), so it carried no
+information the model did not already have. Its absence is pinned by
+[`tests/test_gpa_mean_not_a_predictor.py`](tests/test_gpa_mean_not_a_predictor.py).
 
 The college's records are semester-level, so the derived features apply
 averaging, consistency, minimum and weakness measures to the semester
@@ -224,7 +255,7 @@ than rebuilding them.
 
 **The switch to real data is automatic.** Stage 1 checks for licensure
 outcomes on every run. While they are absent it uses pilot data and writes to
-`results/synthetic/`; once the `nmcle_fail` column is populated it trains on
+`results/synthetic/`; once the `licensure_fail` column is populated it trains on
 the real records, writes to `results/real/`, relabels every figure caption and
 repoints the educator app. No flags, no edits.
 
@@ -242,7 +273,7 @@ Current as of 31 July 2026. Ordered by what blocks what.
 |---|---|---|
 | **Licensure outcomes** for the 2021/22 cohort | College registrar | Everything. Expected Mon 3 Aug |
 | **Confirm source row ordering** in the outcome file, in writing | College registrar | The outcome join. A silent off-by-one corrupts every downstream number without raising an error |
-| **One examination or three?** EH, OHS and OT may sit different licensure exams under different councils | College registrar | Whether `nmcle_fail` is one outcome or three, with 27, 22 and 10 students behind them. Schema question, not wording |
+| **One examination or three?** EH, OHS and OT may sit different licensure exams under different councils | College registrar | Whether `licensure_fail` is one outcome or three, with 27, 22 and 10 students behind them. Schema question, not wording |
 | **Hybrid-data exemption**, allowing a field-plus-replica design in place of public-plus-field | Dr. Osei | Marking scheme item A6 is an automatic fail without it. Methods §2.2.0 documents and justifies it but cannot grant it |
 | **HuSSREC approval reference** | Ethics committee | The placeholder in Methods §2.4 |
 | **Additional cohorts** 2018–2020 and 2023–2024 | College registrar | Precision, not performance. See the sample-size note below |

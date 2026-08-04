@@ -87,7 +87,7 @@ features that together account for {keep_threshold:.0%} of total SHAP importance
 Despite using fewer inputs, E-XGBoost achieved an AUC-PR change of {auc_pr_delta:+.4f}
 and an AUC-ROC change of {auc_roc_delta:+.4f} relative to the baseline. This
 demonstrates that SHAP-guided feature pruning produces a more parsimonious model
-whose explanations are simpler for nurse educators to interpret, without sacrificing
+whose explanations are simpler for allied health educators to interpret, without sacrificing
 predictive performance — positioning SHAP not only as a post-hoc explanation method
 but as an active model-engineering instrument."
 

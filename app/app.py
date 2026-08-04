@@ -155,7 +155,7 @@ def render_results_table(scored, bundle):
     st.download_button(
         "Download full risk report (.csv)",
         scored.to_csv(index=False),
-        file_name="nmc_risk_report.csv",
+        file_name="ahpc_risk_report.csv",
         mime="text/csv",
     )
 
