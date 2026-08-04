@@ -12,6 +12,26 @@ Kwame Nkrumah University of Science and Technology (KNUST), Ghana
 
 ---
 
+## Examining body
+
+This study's cohort (Environmental Health, Occupational Health & Safety, and
+Occupational Therapy at the Accra School of Hygiene) sits the **Allied Health
+Professions Council** licensure examination under the Health Professions
+Regulatory Bodies Act, 2013 (Act 857) — **not** the Nursing and Midwifery
+Council examination.
+
+| | NMC-LE (nursing) | AHPC-LE (this study) |
+|---|---|---|
+| Pass mark | 50% | **60%** |
+| Sat after | Completion of training | **Internship / national service** |
+| Published pass rates | Cited in the literature | **Pass lists only, no denominator** |
+
+Ghanaian nursing licensure studies (Amankwaa et al. 2015 and others) are cited
+as **adjacent-profession** evidence for which predictors matter, never as a
+source for the failure prevalence.
+
+---
+
 ## Overview
 
 Failing a health professions licensure examination at first attempt delays a
@@ -224,7 +244,7 @@ than rebuilding them.
 
 **The switch to real data is automatic.** Stage 1 checks for licensure
 outcomes on every run. While they are absent it uses pilot data and writes to
-`results/synthetic/`; once the `nmcle_fail` column is populated it trains on
+`results/synthetic/`; once the `licensure_fail` column is populated it trains on
 the real records, writes to `results/real/`, relabels every figure caption and
 repoints the educator app. No flags, no edits.
 
@@ -242,7 +262,7 @@ Current as of 31 July 2026. Ordered by what blocks what.
 |---|---|---|
 | **Licensure outcomes** for the 2021/22 cohort | College registrar | Everything. Expected Mon 3 Aug |
 | **Confirm source row ordering** in the outcome file, in writing | College registrar | The outcome join. A silent off-by-one corrupts every downstream number without raising an error |
-| **One examination or three?** EH, OHS and OT may sit different licensure exams under different councils | College registrar | Whether `nmcle_fail` is one outcome or three, with 27, 22 and 10 students behind them. Schema question, not wording |
+| **One examination or three?** EH, OHS and OT may sit different licensure exams under different councils | College registrar | Whether `licensure_fail` is one outcome or three, with 27, 22 and 10 students behind them. Schema question, not wording |
 | **Hybrid-data exemption**, allowing a field-plus-replica design in place of public-plus-field | Dr. Osei | Marking scheme item A6 is an automatic fail without it. Methods §2.2.0 documents and justifies it but cannot grant it |
 | **HuSSREC approval reference** | Ethics committee | The placeholder in Methods §2.4 |
 | **Additional cohorts** 2018–2020 and 2023–2024 | College registrar | Precision, not performance. See the sample-size note below |

@@ -92,7 +92,7 @@ EXCLUDE_STATUSES = ["ABSENT", "DEFERRED", "WITHHELD", "INCOMPLETE", "PENDING"]
 TARGET_RULE = "status"                              # ← EDIT if needed
 
 # Subjects and per-subject columns come from the single source of truth,
-# nmcle_schema.py at the repo root (edit exam papers there, not here).
+# schema.py at the repo root (edit exam papers there, not here).
 import os
 import sys
 
@@ -230,7 +230,7 @@ else:
 
 # A fixed study salt: prevents anyone re-hashing known index numbers
 # to re-identify rows. Keep this string PRIVATE (do not publish).
-STUDY_SALT = "MILLER-22388461-NMCLE-2026"          # ← keep private
+STUDY_SALT = "MILLER-22388461-AHPC-2026"           # ← keep private
 # #TODO - Read from .env - untracked file
 
 def pseudonymise(value: str) -> str:

@@ -53,7 +53,10 @@ CONTEXT_COLS = ["cohort_year", "student_id"]
 
 ALL_FEATURES = NUMERIC_COLS + CATEGORICAL_COLS
 
-TARGET = "fail"  # 1 = failed the licensure examination at first attempt
+# 1 = failed the AHPC licensure examination at first attempt. The examining body
+# is the Allied Health Professions Council (Act 857, 2013), pass mark 60%, sat
+# after internship or national service. Not the Nursing and Midwifery Council.
+TARGET = "fail"
 
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:

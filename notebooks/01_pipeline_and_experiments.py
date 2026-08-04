@@ -81,14 +81,14 @@ print("   XGBoost:", xgb.__version__,
 
 
 # ─────────────────────────────────────────────────────────────
-# CELL 3 — Column schema (single source of truth: nmcle_schema.py)
+# CELL 3 — Column schema (single source of truth: schema.py)
 # The schema, engineered-column lists, and engineer_features all live in
-# nmcle_schema.py at the repo root, so subjects/columns never drift between
+# schema.py at the repo root, so subjects/columns never drift between
 # notebooks. To change the exam papers or feature set, edit ONLY that file.
 #
 # run_all.py puts the repo root on sys.path. The block below also finds it for a
 # direct `python notebooks/01_...py` run. In Colab, clone the repo and run from
-# inside it so nmcle_schema.py sits on the path.
+# inside it so schema.py sits on the path.
 # ─────────────────────────────────────────────────────────────
 import sys
 
@@ -148,7 +148,7 @@ print(syn_df[["cgpa", "gpa_sem1", "gpa_sem6", "n_courses",
 # ─────────────────────────────────────────────────────────────
 # CELL 5 — Feature engineering
 # engineer_features() and the engineered-column lists are defined in
-# nmcle_schema.py (imported in CELL 3). This cell just applies them.
+# schema.py (imported in CELL 3). This cell just applies them.
 # ─────────────────────────────────────────────────────────────
 
 # Apply to synthetic data

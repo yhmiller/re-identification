@@ -1,6 +1,6 @@
 # ============================================================
 # requirements.txt
-# Project: Explainable ML for Predicting Nursing Licensure
+# Project: Explainable ML for Predicting Allied Health Licensure
 #          Examination Failure in Ghana (XGBoost-SHAP)
 # Author:  Prince Bortey Miller | 22388461 | KNUST
 # ============================================================
