@@ -1,26 +1,43 @@
-# ── Data privacy: NEVER commit participant data ──────────────
+# Participant data. Nothing under here may ever reach the remote: the raw
+# college records, the survey exports, and the SID-to-index linkage table are
+# all directly or indirectly identifying.
 data/
 *.xlsx
 *.xls
+*.docx
 anonymised_records.csv
 raw_college_records.*
+*linkage*
+*_linkage.csv
 
-# ── Environments ─────────────────────────────────────────────
+# Manuscript drafts, ethics paperwork, questionnaires, and the reference
+# thesis collection. These carry consent forms and third-party student work.
+/proposal
+/docs
+/local
+
+# Generated artefacts. Every one is reproducible with ./run.sh.
+/results
+*.pkl
+
+# Environments
 ml_env/
 venv/
 .env
 
-# ── Python ───────────────────────────────────────────────────
+# Python
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
 
-# ── OS noise ─────────────────────────────────────────────────
+# OS noise
 .DS_Store
 Thumbs.db
 
-# ── Local model artefacts (regenerate by running the stages) ─
-*.pkl
-/results
-/proposal
-/docs
+# Tooling
+.gstack/
+
+# Explicit exceptions: documentation that is safe to publish and is tracked
+# despite the /docs rule above.
+!docs/E-XGBoost-technical-documentation.md
+!docs/TODO.md

@@ -2,6 +2,13 @@
 # 01_pipeline_and_experiments.py
 # Paste each section into a new Colab cell as indicated.
 #
+# This notebook is the NARRATIVE/ORCHESTRATION layer: it loads data, calls
+# into the reusable modules at the repo root (baseline_xgboost.py,
+# stats_validation.py, synthetic_data.py, prediction.py), and renders
+# figures/tables. The actual model-training and statistics logic lives in
+# those modules so it is reusable and independently testable — see
+# docs/TODO.md, "Codebase restructure: extract core logic into modules".
+#
 # Project : Explainable ML for Predicting NMC-LE Failure in Ghana
 # Author  : Prince Bortey Miller | ID: 22388461 | KNUST
 # Supervisor: Dr. Eric Opoku Osei
@@ -39,7 +46,6 @@ except NameError:
     matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
-import joblib
 
 # macOS OpenMP guard — must run before `import shap`, which eagerly imports
 # torch. LightGBM links Homebrew's libomp while torch bundles its own; whichever
@@ -51,24 +57,10 @@ lgb.LGBMClassifier(n_estimators=1).fit(np.zeros((4, 1)), [0, 1, 0, 1])
 
 import shap
 import xgboost as xgb
-
-from sklearn.linear_model   import LogisticRegression
-from sklearn.ensemble       import RandomForestClassifier
-from sklearn.pipeline       import Pipeline
-from sklearn.compose        import ColumnTransformer
-from sklearn.preprocessing  import MinMaxScaler, OneHotEncoder
-from sklearn.impute         import SimpleImputer
-from sklearn.model_selection import StratifiedKFold, train_test_split
-from sklearn.metrics        import (roc_auc_score, average_precision_score,
-                                    f1_score, precision_score, recall_score,
-                                    brier_score_loss, confusion_matrix,
-                                    RocCurveDisplay, PrecisionRecallDisplay)
-from sklearn.calibration     import CalibrationDisplay
-from imblearn.over_sampling import SMOTE
-from imblearn.pipeline      import Pipeline as ImbPipeline
-from statsmodels.stats.contingency_tables import mcnemar
-from scipy                  import stats
-import statsmodels.api as sm
+from sklearn.metrics import (RocCurveDisplay, PrecisionRecallDisplay,
+                             brier_score_loss)
+from sklearn.calibration import CalibrationDisplay
+from sklearn.model_selection import train_test_split
 
 warnings.filterwarnings('ignore')
 
@@ -77,9 +69,10 @@ SEED = 42
 os.environ['PYTHONHASHSEED'] = str(SEED)
 np.random.seed(SEED)
 
-# All figures, metrics, models and config land here (per PROJECT_GUIDE §1).
-RESULTS_DIR = "results"
-os.makedirs(RESULTS_DIR, exist_ok=True)
+# Results are split by dataset source: results/synthetic/ or results/real/
+# (see docs/TODO.md, "Performance tracking: baseline model on both datasets")
+# — RESULTS_DIR is finalised once DATA_SOURCE is known, in CELL 6.
+RESULTS_ROOT = "results"
 
 print("✅ Imports and seeds set. numpy seed:", SEED)
 print("   XGBoost:", xgb.__version__,
@@ -88,42 +81,36 @@ print("   XGBoost:", xgb.__version__,
 
 
 # ─────────────────────────────────────────────────────────────
-# CELL 3 — Column schema definition
-# Define ALL columns here. Swap in real data later with
-# the SAME column names — no code changes needed.
+# CELL 3 — Column schema (single source of truth: nmcle_schema.py)
+# The schema, engineered-column lists, and engineer_features all live in
+# nmcle_schema.py at the repo root, so subjects/columns never drift between
+# notebooks. To change the exam papers or feature set, edit ONLY that file.
+#
+# run_all.py puts the repo root on sys.path. The block below also finds it for a
+# direct `python notebooks/01_...py` run. In Colab, clone the repo and run from
+# inside it so nmcle_schema.py sits on the path.
 # ─────────────────────────────────────────────────────────────
+import sys
 
-# NMC-LE has 6 theory papers:
-NMC_SUBJECTS = [
-    "medical_surgical",
-    "mental_health",
-    "paediatric",
-    "public_health",
-    "obstetric",
-    "pharmacology",
-]
+try:
+    _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if _repo_root not in sys.path:
+        sys.path.insert(0, _repo_root)
+except NameError:
+    pass  # __file__ is undefined in a pasted Colab cell — rely on the cwd
 
-# Continuous assessment columns (one per subject, 0–100)
-CA_COLS  = [f"ca_{s}"   for s in NMC_SUBJECTS]
-# Mock exam columns (one per subject, 0–100)
-MOCK_COLS = [f"mock_{s}" for s in NMC_SUBJECTS]
-
-# All numeric feature columns (pre-exam only — NO leakage)
-NUMERIC_COLS = (
-    ["wassce_aggregate", "programme_cgpa"]
-    + CA_COLS
-    + MOCK_COLS
+from nmcle_schema import (
+    NMC_SUBJECTS, CA_COLS, MOCK_COLS,
+    NUMERIC_COLS, CATEGORICAL_COLS, ALL_FEATURES, TARGET,
+    engineer_features, ENGINEERED_NUMERIC, ALL_NUMERIC, ALL_FEATURES_V2,
 )
 
-# Categorical feature columns
-# CATEGORICAL_COLS = ["programme_type", "age_band", "gender", "region"]
-CATEGORICAL_COLS = ["programme_type", "age_band", "gender"]
-
-# All predictor columns
-ALL_FEATURES = NUMERIC_COLS + CATEGORICAL_COLS
-
-# Target column
-TARGET = "fail"   # 1 = failed ≥1 paper on first attempt; 0 = passed all
+# Reusable core-logic modules (repo root) — see docs/TODO.md for the map of
+# which notebook cell each one used to be.
+import synthetic_data
+import baseline_xgboost
+import stats_validation
+import prediction
 
 print("✅ Schema defined.")
 print(f"   Numeric features : {len(NUMERIC_COLS)}")
@@ -139,155 +126,34 @@ print(f"   Target : '{TARGET}' (1 = fail, 0 = pass)")
 # Swap in real anonymised data in CELL 6 and everything
 # downstream runs unchanged.
 # ─────────────────────────────────────────────────────────────
-from sdv.single_table import GaussianCopulaSynthesizer
-from sdv.metadata    import SingleTableMetadata
 
-def build_schema_dataframe(n=20):
-    """
-    Build a tiny hand-crafted reference table that tells SDV
-    the realistic distribution of each column.
-    """
-    rng = np.random.default_rng(SEED)
-
-    df = pd.DataFrame()
-    df["wassce_aggregate"] = rng.integers(6, 36, n).astype(float)
-    df["programme_cgpa"]   = np.clip(rng.normal(2.8, 0.6, n), 1.0, 4.0)
-
-    for col in CA_COLS:
-        df[col] = np.clip(rng.normal(62, 12, n), 20, 100)
-    for col in MOCK_COLS:
-        df[col] = np.clip(rng.normal(58, 15, n), 10, 100)
-
-    df["programme_type"] = rng.choice(["RGN", "RM", "NAC", "NAP"],
-                                       n, p=[0.55, 0.25, 0.12, 0.08])
-    df["age_band"]  = rng.choice(["Below 20", "20-24", "25-29", "30+"],
-                                  n, p=[0.10, 0.55, 0.25, 0.10])
-    df["gender"]    = rng.choice(["Female", "Male"], n, p=[0.72, 0.28])
-
-    # Context columns — NOT model predictors. region drives fairness
-    # disaggregation; cohort_year drives the temporal split. Both are collected
-    # on the College Data Extraction Form (Questionnaire 3).
-    df["region"] = rng.choice(
-        ["Ashanti", "Greater Accra", "Eastern", "Central",
-         "Western", "Brong-Ahafo", "Northern", "Other"],
-        n, p=[0.22, 0.18, 0.12, 0.10, 0.10, 0.08, 0.10, 0.10])
-    df["cohort_year"] = rng.choice([2021, 2022, 2023, 2024], n)
-
-    # Target: loosely correlated with CGPA and mock performance.
-    # Center the linear predictor on its own mean so the synthetic fail
-    # rate lands near 50% (the national NMC-LE first-attempt rate);
-    # uncentered, typical students sit far below threshold and the
-    # generated target collapses to all-Pass.
-    linear = (-0.5 * df["programme_cgpa"]
-              - 0.02 * df[[f"mock_{s}" for s in NMC_SUBJECTS]].mean(axis=1))
-    logit = (linear - linear.mean()) + rng.normal(0, 0.5, n)
-    prob_fail = 1 / (1 + np.exp(-logit))
-    # Keep as bool to match the boolean sdtype declared in the SDV metadata;
-    # the sampled output is cast back to int after generation.
-    df[TARGET] = prob_fail > 0.5
-    return df
-
-# Build reference schema and fit SDV synthesiser
-schema_df = build_schema_dataframe(n=30)
-
-metadata = SingleTableMetadata()
-metadata.detect_from_dataframe(schema_df)
-# Override SDV's guesses for columns that need specific types
-metadata.update_column("programme_type", sdtype="categorical")
-metadata.update_column("age_band",       sdtype="categorical")
-metadata.update_column("gender",         sdtype="categorical")
-metadata.update_column("region",         sdtype="categorical")
-metadata.update_column("cohort_year",    sdtype="categorical")   # discrete years
-metadata.update_column(TARGET,           sdtype="boolean")
-
-synthesiser = GaussianCopulaSynthesizer(metadata, enforce_rounding=True)
-synthesiser.fit(schema_df)
-
-# Generate 1,000 synthetic rows
-syn_df = synthesiser.sample(num_rows=1000)
-syn_df[TARGET] = syn_df[TARGET].astype(int)
-syn_df["cohort_year"] = syn_df["cohort_year"].astype(int)   # years for temporal split
+syn_df = synthetic_data.generate_pilot_data(
+    CA_COLS, MOCK_COLS, NMC_SUBJECTS, TARGET, SEED,
+    n_reference=30, n_rows=1000,
+)
 
 print("✅ Synthetic data generated.")
 print(f"   Shape  : {syn_df.shape}")
 print(f"   Columns: {list(syn_df.columns)}")
 print(f"\n   Target distribution (SYNTHETIC DATA — NOT real results):")
-print(syn_df[TARGET].value_counts(normalize=True).rename({0:"Pass",1:"Fail"}))
+print(syn_df[TARGET].value_counts(normalize=True).rename({0: "Pass", 1: "Fail"}))
 print("\n   ⚠️  SYNTHETIC DATA — used for pipeline testing only.")
 print("   Real data will be loaded in CELL 6 when available.")
 print("\n   Preview:")
-print(syn_df[["wassce_aggregate","programme_cgpa",
-              "ca_medical_surgical","mock_medical_surgical",
+print(syn_df[["wassce_aggregate", "programme_cgpa",
+              "ca_medical_surgical", "mock_medical_surgical",
               TARGET]].head(5).to_string(index=False))
 
 
 # ─────────────────────────────────────────────────────────────
 # CELL 5 — Feature engineering
-# Add derived features that go beyond raw scores.
-# Applied AFTER the raw data is loaded (real or synthetic).
+# engineer_features() and the engineered-column lists are defined in
+# nmcle_schema.py (imported in CELL 3). This cell just applies them.
 # ─────────────────────────────────────────────────────────────
-
-def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Add pre-exam-only engineered features.
-    All inputs must be available BEFORE the student sits the NMC-LE.
-    """
-    df = df.copy()
-
-    # ── 1. Average CA and mock scores ──────────────────────────
-    df["ca_avg"]   = df[CA_COLS].mean(axis=1)
-    df["mock_avg"] = df[MOCK_COLS].mean(axis=1)
-
-    # ── 2. CA-to-mock gap: positive = performed better in CA than mocks ──
-    df["ca_mock_gap"] = df["ca_avg"] - df["mock_avg"]
-
-    # ── 3. Performance consistency: low variance = consistent student ──
-    df["ca_consistency"]   = df[CA_COLS].std(axis=1)
-    df["mock_consistency"] = df[MOCK_COLS].std(axis=1)
-
-    # ── 4. Subject-level weakness flags (below 50 is a concerning score) ──
-    for s in NMC_SUBJECTS:
-        df[f"weak_ca_{s}"]   = (df[f"ca_{s}"]   < 50).astype(int)
-        df[f"weak_mock_{s}"] = (df[f"mock_{s}"] < 50).astype(int)
-
-    # ── 5. Total weak subjects count ─────────────────────────────
-    weak_ca_cols   = [f"weak_ca_{s}"   for s in NMC_SUBJECTS]
-    weak_mock_cols = [f"weak_mock_{s}" for s in NMC_SUBJECTS]
-    df["n_weak_ca_subjects"]   = df[weak_ca_cols].sum(axis=1)
-    df["n_weak_mock_subjects"] = df[weak_mock_cols].sum(axis=1)
-
-    # ── 6. Minimum mock score (identifies worst single subject) ────
-    df["min_mock_score"] = df[MOCK_COLS].min(axis=1)
-    df["min_ca_score"]   = df[CA_COLS].min(axis=1)
-
-    # ── 7. WASSCE band (ordinal encoding for tree models) ──────────
-    # Lower aggregate = better in Ghana's WASSCE
-    df["wassce_band"] = pd.cut(
-        df["wassce_aggregate"],
-        bins=[0, 12, 18, 24, 36],
-        labels=[3, 2, 1, 0],   # 3=excellent, 0=below average
-        right=True
-    ).astype(float)
-
-    return df
-
 
 # Apply to synthetic data
 syn_df = engineer_features(syn_df)
 print("✅ Feature engineering applied.")
-
-# Updated column lists after engineering
-ENGINEERED_NUMERIC = [
-    "ca_avg", "mock_avg", "ca_mock_gap",
-    "ca_consistency", "mock_consistency",
-    "n_weak_ca_subjects", "n_weak_mock_subjects",
-    "min_mock_score", "min_ca_score",
-    "wassce_band",
-] + [f"weak_ca_{s}" for s in NMC_SUBJECTS] \
-  + [f"weak_mock_{s}" for s in NMC_SUBJECTS]
-
-ALL_NUMERIC    = NUMERIC_COLS + ENGINEERED_NUMERIC
-ALL_FEATURES_V2 = ALL_NUMERIC + CATEGORICAL_COLS
 
 print(f"   Total features after engineering: {len(ALL_FEATURES_V2)}")
 print(f"   Engineered features added: {len(ENGINEERED_NUMERIC)}")
@@ -317,6 +183,13 @@ raw_df = syn_df.copy()
 DATA_SOURCE = "synthetic"   # flips the app's illustrative-only banner; set to "real" above
 print("ℹ️  Using SYNTHETIC data (pipeline testing mode).")
 
+# Results land in results/<DATA_SOURCE>/ so a real run and a synthetic run
+# never overwrite each other's artefacts (see docs/TODO.md, "Performance
+# tracking: baseline model on both datasets").
+RESULTS_DIR = os.path.join(RESULTS_ROOT, DATA_SOURCE)
+os.makedirs(RESULTS_DIR, exist_ok=True)
+print(f"   Results directory: {RESULTS_DIR}/")
+
 # ── Validate required columns ───────────────────────────────────
 missing = [c for c in ALL_FEATURES_V2 + [TARGET] if c not in raw_df.columns]
 if missing:
@@ -342,7 +215,8 @@ else:
 # CELL 7 — Train / validation / test split
 # Two splits applied:
 #   1. Stratified random split (70/15/15) — primary
-#   2. Temporal split — if cohort year column exists
+#   2. Temporal split — if cohort year column exists (handled inside
+#      baseline_xgboost.temporal_validation in CELL 11.7)
 # ─────────────────────────────────────────────────────────────
 
 X = raw_df[ALL_FEATURES_V2]
@@ -362,17 +236,8 @@ print(f"   Train : {X_train.shape[0]} rows | Fail rate: {y_train.mean():.2f}")
 print(f"   Val   : {X_val.shape[0]} rows   | Fail rate: {y_val.mean():.2f}")
 print(f"   Test  : {X_test.shape[0]} rows  | Fail rate: {y_test.mean():.2f}")
 
-# ── Temporal split (if cohort_year exists in real data) ──────
 if "cohort_year" in raw_df.columns:
-    years = sorted(raw_df["cohort_year"].unique())
-    latest = years[-1]
-    train_mask = raw_df["cohort_year"] < latest
-    test_mask  = raw_df["cohort_year"] == latest
-    X_train_t, y_train_t = X[train_mask], y[train_mask]
-    X_test_t,  y_test_t  = X[test_mask],  y[test_mask]
-    print(f"\n✅ Temporal split: train on {years[:-1]}, test on {latest}")
-    print(f"   Train: {X_train_t.shape[0]} | Test: {X_test_t.shape[0]}")
-    print("   Real-world deployment scenario: model predicts a future cohort.")
+    print(f"\nℹ️  cohort_year present — temporal validation runs in CELL 11.7.")
 else:
     print("\nℹ️  No cohort_year column — temporal split skipped.")
     print("   Add cohort_year to real data for temporal validation.")
@@ -381,37 +246,18 @@ else:
 # ─────────────────────────────────────────────────────────────
 # CELL 8 — Preprocessing pipeline (scikit-learn)
 # Handles: imputation → scaling → encoding
-# This is a reusable sklearn Pipeline object.
+# This is a reusable sklearn Pipeline object. (baseline_xgboost.build_preprocessor)
 # ─────────────────────────────────────────────────────────────
 
-numeric_transformer = Pipeline(steps=[
-    ("imputer", SimpleImputer(strategy="median")),
-    ("scaler",  MinMaxScaler()),
-])
-
-categorical_transformer = Pipeline(steps=[
-    ("imputer", SimpleImputer(strategy="most_frequent")),
-    ("encoder", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
-])
-
-preprocessor = ColumnTransformer(transformers=[
-    ("num", numeric_transformer,    ALL_NUMERIC),
-    ("cat", categorical_transformer, CATEGORICAL_COLS),
-], remainder="drop")
+preprocessor = baseline_xgboost.build_preprocessor(ALL_NUMERIC, CATEGORICAL_COLS)
 
 # Quick smoke test
 X_train_proc = preprocessor.fit_transform(X_train)
 X_val_proc   = preprocessor.transform(X_val)
 X_test_proc  = preprocessor.transform(X_test)
 
-# Get transformed feature names for SHAP later
-num_features  = ALL_NUMERIC
-cat_features  = (preprocessor
-                 .named_transformers_["cat"]
-                 .named_steps["encoder"]
-                 .get_feature_names_out(CATEGORICAL_COLS)
-                 .tolist())
-FEATURE_NAMES = num_features + cat_features
+FEATURE_NAMES = baseline_xgboost.encoded_feature_names(
+    preprocessor, ALL_NUMERIC, CATEGORICAL_COLS)
 
 print("✅ Preprocessing pipeline built and fitted.")
 print(f"   Input features  : {X_train.shape[1]}")
@@ -420,149 +266,62 @@ print(f"   Train rows      : {X_train_proc.shape[0]}")
 
 
 # ─────────────────────────────────────────────────────────────
-# CELL 9 — Helper: evaluate any classifier
-# Computes all required metrics in one call.
+# CELL 9 — Baseline comparator models (Logistic Regression, RF, LightGBM)
+# All use the SAME preprocessor from CELL 8. (baseline_xgboost.train_comparator_baselines)
 # ─────────────────────────────────────────────────────────────
 
-def evaluate_model(name, y_true, y_pred_proba, y_pred_labels):
-    """Return a dict of all evaluation metrics for a model."""
-    return {
-        "model"     : name,
-        "auc_roc"   : roc_auc_score(y_true, y_pred_proba),
-        "auc_pr"    : average_precision_score(y_true, y_pred_proba),
-        "f1_weighted": f1_score(y_true, y_pred_labels, average="weighted", zero_division=0),
-        "precision" : precision_score(y_true, y_pred_labels, zero_division=0),
-        "recall"    : recall_score(y_true, y_pred_labels, zero_division=0),
-        "brier"     : brier_score_loss(y_true, y_pred_proba),
-    }
+baseline_results, baseline_models, baseline_probas = baseline_xgboost.train_comparator_baselines(
+    X_train_proc, y_train, X_val_proc, y_val, X_test_proc, y_test, SEED)
+lr_proba, rf_proba, lgbm_proba = (baseline_probas["Logistic Regression"],
+                                   baseline_probas["Random Forest"],
+                                   baseline_probas["LightGBM"])
 
-def print_metrics(results: dict):
-    print(f"\n  {'Model':<22} {'AUC-ROC':>8} {'AUC-PR':>8} "
-          f"{'F1-W':>8} {'Prec':>8} {'Recall':>8} {'Brier':>8}")
-    print("  " + "─"*70)
-    for r in results:
-        print(f"  {r['model']:<22} {r['auc_roc']:>8.4f} {r['auc_pr']:>8.4f} "
-              f"{r['f1_weighted']:>8.4f} {r['precision']:>8.4f} "
-              f"{r['recall']:>8.4f} {r['brier']:>8.4f}")
-
-print("✅ Evaluation helper defined.")
-
-
-# ─────────────────────────────────────────────────────────────
-# CELL 10 — Baseline models (Logistic Regression, RF, LightGBM)
-# All use the SAME preprocessor from CELL 8.
-# ─────────────────────────────────────────────────────────────
-
-# Logistic Regression
-lr = LogisticRegression(max_iter=1000, random_state=SEED, class_weight="balanced")
-lr.fit(X_train_proc, y_train)
-lr_proba  = lr.predict_proba(X_test_proc)[:, 1]
-lr_labels = lr.predict(X_test_proc)
-lr_res = evaluate_model("Logistic Regression", y_test, lr_proba, lr_labels)
-
-# Random Forest
-rf = RandomForestClassifier(n_estimators=500, n_jobs=-1, random_state=SEED,
-                             class_weight="balanced")
-rf.fit(X_train_proc, y_train)
-rf_proba  = rf.predict_proba(X_test_proc)[:, 1]
-rf_labels = rf.predict(X_test_proc)
-rf_res = evaluate_model("Random Forest", y_test, rf_proba, rf_labels)
-
-# LightGBM
-lgbm_clf = lgb.LGBMClassifier(n_estimators=500, random_state=SEED,
-                                verbose=-1, class_weight="balanced")
-lgbm_clf.fit(X_train_proc, y_train,
-             eval_set=[(X_val_proc, y_val)],
-             callbacks=[lgb.early_stopping(50, verbose=False)])
-lgbm_proba  = lgbm_clf.predict_proba(X_test_proc)[:, 1]
-lgbm_labels = lgbm_clf.predict(X_test_proc)
-lgbm_res = evaluate_model("LightGBM", y_test, lgbm_proba, lgbm_labels)
-
-baseline_results = [lr_res, rf_res, lgbm_res]
 print("✅ Baseline models trained and evaluated on test set.")
-print_metrics(baseline_results)
+stats_validation.print_metrics(baseline_results)
 
-# Save for later comparison
-joblib.dump(lr,  os.path.join(RESULTS_DIR, "lr_baseline.pkl"))
-joblib.dump(rf,  os.path.join(RESULTS_DIR, "rf_baseline.pkl"))
-joblib.dump(lgbm_clf, os.path.join(RESULTS_DIR, "lgbm_baseline.pkl"))
+import joblib
+joblib.dump(baseline_models["Logistic Regression"], os.path.join(RESULTS_DIR, "lr_baseline.pkl"))
+joblib.dump(baseline_models["Random Forest"], os.path.join(RESULTS_DIR, "rf_baseline.pkl"))
+joblib.dump(baseline_models["LightGBM"], os.path.join(RESULTS_DIR, "lgbm_baseline.pkl"))
 print("\n   Models saved.")
 
 
 # ─────────────────────────────────────────────────────────────
 # CELL 10.5 — Hyperparameter grid search (XGBoost)
-# Tune the core hyperparameters by 5-fold CV on the training split,
+# Tune the core hyperparameters by N_CV_FOLDS-fold CV on the training split,
 # scoring AUC-PR (the primary metric). The winners feed CELL 11.
+# (baseline_xgboost.tune_xgboost)
 # ─────────────────────────────────────────────────────────────
-from sklearn.model_selection import GridSearchCV
 
-# Estimated class weight (updates automatically with real-data prevalence)
-neg = int((y_train == 0).sum())
-pos = int((y_train == 1).sum())
-spw = round(neg / pos, 2) if pos > 0 else 1
-print(f"ℹ️  scale_pos_weight = {spw} (neg/pos = {neg}/{pos})")
-
-XGB_PARAM_GRID = {
-    "max_depth":        [3, 6],
-    "learning_rate":    [0.05, 0.10],
-    "n_estimators":     [300, 500],
-    "subsample":        [0.8],
-    "colsample_bytree": [0.8],
-}
-grid = GridSearchCV(
-    xgb.XGBClassifier(scale_pos_weight=spw, eval_metric="aucpr",
-                      random_state=SEED, verbosity=0, use_label_encoder=False),
-    XGB_PARAM_GRID,
-    scoring="average_precision",   # AUC-PR
-    cv=StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED),
-    n_jobs=1,
-)
-grid.fit(X_train_proc, y_train)
-best_xgb_params = grid.best_params_
+best_xgb_params, spw, grid = baseline_xgboost.tune_xgboost(X_train_proc, y_train, SEED)
+print(f"ℹ️  scale_pos_weight = {spw}")
 print("✅ Grid search complete.")
 print(f"   Best params   : {best_xgb_params}")
 print(f"   Best CV AUC-PR: {grid.best_score_:.4f}")
 
 
 # ─────────────────────────────────────────────────────────────
-# CELL 11 — XGBoost model
-# Final model uses the grid-search winners + early stopping on
-# validation AUC-PR.
+# CELL 11 — XGBoost model (the baseline the whole project compares against)
+# Final model uses the grid-search winners + early stopping on validation
+# AUC-PR. (baseline_xgboost.train_xgboost)
 # ─────────────────────────────────────────────────────────────
 
-xgb_clf = xgb.XGBClassifier(
-    **best_xgb_params,
-    scale_pos_weight  = spw,
-    eval_metric       = "aucpr",
-    early_stopping_rounds = 50,
-    random_state      = SEED,
-    verbosity         = 0,
-    use_label_encoder = False,
-)
-
-xgb_clf.fit(
-    X_train_proc, y_train,
-    eval_set=[(X_val_proc, y_val)],
-    verbose=False,
-)
-
-xgb_proba  = xgb_clf.predict_proba(X_test_proc)[:, 1]
-xgb_labels = xgb_clf.predict(X_test_proc)
-xgb_res = evaluate_model("XGBoost", y_test, xgb_proba, xgb_labels)
+xgb_clf, xgb_res, xgb_proba, xgb_labels = baseline_xgboost.train_xgboost(
+    X_train_proc, y_train, X_val_proc, y_val, X_test_proc, y_test,
+    best_xgb_params, spw, SEED)
 
 print("✅ XGBoost trained.")
 print(f"   Best iteration: {xgb_clf.best_iteration}")
 all_results = baseline_results + [xgb_res]
-print_metrics(all_results)
+stats_validation.print_metrics(all_results)
 
 joblib.dump(xgb_clf, os.path.join(RESULTS_DIR, "xgboost_model.pkl"))
-print("\n   Model saved → results/xgboost_model.pkl")
+print("\n   Model saved → " + RESULTS_DIR + "/xgboost_model.pkl")
 
-# Self-contained bundle for the educator screening app (Phase 2). cloudpickle
-# captures engineer_features WITH its referenced globals (CA_COLS, etc.), so the
+# Self-contained bundle for the educator screening app (Phase 2). prediction.save_bundle
+# cloudpickles engineer_features WITH its referenced globals (CA_COLS, etc.), so the
 # app reproduces the exact training-time transform: raw record → engineer →
 # preprocess → predict. Re-running on real data regenerates this automatically.
-import cloudpickle
 INFERENCE_BUNDLE = {
     "model": xgb_clf,
     "preprocessor": preprocessor,
@@ -574,64 +333,50 @@ INFERENCE_BUNDLE = {
     "target": TARGET,
     "data_source": DATA_SOURCE,   # "synthetic" or "real" — drives the app banner
 }
-with open(os.path.join(RESULTS_DIR, "inference_bundle.pkl"), "wb") as f:
-    cloudpickle.dump(INFERENCE_BUNDLE, f)
-print("   Inference bundle saved → results/inference_bundle.pkl")
+prediction.save_bundle(INFERENCE_BUNDLE, os.path.join(RESULTS_DIR, "inference_bundle.pkl"))
+print("   Inference bundle saved → " + RESULTS_DIR + "/inference_bundle.pkl")
+
+
+# ─────────────────────────────────────────────────────────────
+# CELL 11.3 — Class-wise metrics (confusion matrix, sensitivity/specificity)
+# Aggregate AUC-ROC/AUC-PR hide how the model does on Fail specifically —
+# sensitivity (recall on Fail) is the number that matters here, since a
+# false negative means a genuinely at-risk student is missed.
+# (stats_validation.class_metrics)
+# ─────────────────────────────────────────────────────────────
+
+xgb_class_metrics = stats_validation.class_metrics(y_test.values, xgb_labels)
+stats_validation.print_class_metrics(xgb_class_metrics, model_name="XGBoost (baseline)")
 
 
 # ─────────────────────────────────────────────────────────────
 # CELL 11.5 — Repeated-seed variance
 # Retrain the tuned model under 10 random seeds and report the spread
 # of test metrics — confirms results are not a single-seed fluke.
+# (baseline_xgboost.repeated_seed_variance)
 # ─────────────────────────────────────────────────────────────
 SEED_RUNS = 10
-seed_rows = []
-for s in range(SEED_RUNS):
-    m = xgb.XGBClassifier(**best_xgb_params, scale_pos_weight=spw,
-                          eval_metric="aucpr", random_state=s,
-                          verbosity=0, use_label_encoder=False)
-    m.fit(X_train_proc, y_train)
-    p = m.predict_proba(X_test_proc)[:, 1]
-    seed_rows.append({
-        "seed": s,
-        "auc_roc": round(roc_auc_score(y_test, p), 4),
-        "auc_pr":  round(average_precision_score(y_test, p), 4),
-    })
-seed_var_df = pd.DataFrame(seed_rows)
+seed_var_df = baseline_xgboost.repeated_seed_variance(
+    X_train_proc, y_train, X_test_proc, y_test, best_xgb_params, spw, n_runs=SEED_RUNS)
 seed_var_df.to_csv(os.path.join(RESULTS_DIR, "seed_variance.csv"), index=False)
 print(f"✅ Repeated-seed variance ({SEED_RUNS} runs):")
 print(f"   AUC-ROC: {seed_var_df['auc_roc'].mean():.4f} ± {seed_var_df['auc_roc'].std():.4f}")
 print(f"   AUC-PR : {seed_var_df['auc_pr'].mean():.4f} ± {seed_var_df['auc_pr'].std():.4f}")
-print("   Saved → results/seed_variance.csv")
+print("   Saved → " + RESULTS_DIR + "/seed_variance.csv")
 
 
 # ─────────────────────────────────────────────────────────────
 # CELL 11.7 — Temporal validation (train earlier cohorts → test latest)
 # The honest deployment scenario: predict a future cohort from past ones.
-# Runs only when cohort_year is present (set up in CELL 7).
+# Runs only when cohort_year is present. (baseline_xgboost.temporal_validation)
 # ─────────────────────────────────────────────────────────────
-if "cohort_year" in raw_df.columns and y_test_t.nunique() > 1:
-    from sklearn.base import clone
-    pre_t = clone(preprocessor)
-    Xtr_t = pre_t.fit_transform(X_train_t)
-    Xte_t = pre_t.transform(X_test_t)
-    m_t = xgb.XGBClassifier(**best_xgb_params, scale_pos_weight=spw,
-                            eval_metric="aucpr", random_state=SEED,
-                            verbosity=0, use_label_encoder=False)
-    m_t.fit(Xtr_t, y_train_t)
-    p_t = m_t.predict_proba(Xte_t)[:, 1]
-    temporal_df = pd.DataFrame([{
-        "train_cohorts": ",".join(str(int(yr)) for yr in years[:-1]),
-        "test_cohort":   int(latest),
-        "n_train":       int(len(X_train_t)),
-        "n_test":        int(len(X_test_t)),
-        "auc_roc":       round(roc_auc_score(y_test_t, p_t), 4),
-        "auc_pr":        round(average_precision_score(y_test_t, p_t), 4),
-    }])
+temporal_df = baseline_xgboost.temporal_validation(
+    raw_df, X, y, preprocessor, best_xgb_params, spw, SEED)
+if temporal_df is not None:
     temporal_df.to_csv(os.path.join(RESULTS_DIR, "temporal_validation.csv"), index=False)
     print("✅ Temporal validation (train past cohorts → test latest):")
     print(temporal_df.to_string(index=False))
-    print("   Saved → results/temporal_validation.csv")
+    print("   Saved → " + RESULTS_DIR + "/temporal_validation.csv")
 else:
     print("ℹ️  Temporal validation skipped (no cohort_year, or test cohort single-class).")
 
@@ -760,11 +505,9 @@ for mname, proba in models_eval:
 fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
 for mname, proba in models_eval:
-    fpr, tpr, _ = RocCurveDisplay.from_predictions(
+    RocCurveDisplay.from_predictions(
         y_test, proba, name=mname, ax=axes[0], plot_chance_level=(mname=="XGBoost")
-    ).fpr, RocCurveDisplay.from_predictions(
-        y_test, proba, name=mname, ax=axes[0]
-    ).tpr, None
+    )
     PrecisionRecallDisplay.from_predictions(
         y_test, proba, name=mname, ax=axes[1]
     )
@@ -783,70 +526,8 @@ print("✅ ROC + PR curves saved → roc_pr_curves.png")
 # Tests H1: XGBoost significantly outperforms Logistic Regression.
 # DeLong = correct test for comparing AUC values.
 # McNemar = for label disagreement only (see CELL 17).
+# (stats_validation.delong_test)
 # ─────────────────────────────────────────────────────────────
-
-def delong_test(y_true, proba_a, proba_b):
-    """
-    Non-parametric DeLong test for comparing two AUCs.
-    Returns z-statistic and two-tailed p-value.
-    Reference: DeLong et al. (1988), Biometrics.
-    """
-    def _compute_midrank(x):
-        J = np.argsort(x)
-        Z = x[J]
-        N = len(x)
-        T = np.zeros(N, dtype=np.float64)
-        i = 0
-        while i < N:
-            j = i
-            while j < N and Z[j] == Z[i]:
-                j += 1
-            T[i:j] = 0.5 * (i + j - 1)
-            i = j
-        T2 = np.empty(N, dtype=np.float64)
-        T2[J] = T + 1
-        return T2
-
-    def _fastDeLong(predictions_sorted_transposed, label_1_count):
-        m = label_1_count
-        n = predictions_sorted_transposed.shape[1] - m
-        positive_examples = predictions_sorted_transposed[:, :m]
-        negative_examples = predictions_sorted_transposed[:, m:]
-        k = predictions_sorted_transposed.shape[0]
-
-        tx = np.empty([k, m], dtype=float)
-        ty = np.empty([k, n], dtype=float)
-        tz = np.empty([k, m + n], dtype=float)
-
-        for r in range(k):
-            tx[r, :] = _compute_midrank(positive_examples[r, :])
-            ty[r, :] = _compute_midrank(negative_examples[r, :])
-            tz[r, :] = _compute_midrank(predictions_sorted_transposed[r, :])
-
-        aucs = (tz[:, :m].sum(axis=1) / m / n
-                - (m + 1.0) / (2.0 * n))
-        v01 = (tz[:, :m] - tx) / n
-        v10 = 1.0 - (tz[:, m:] - ty) / m
-        sx = np.cov(v01)
-        sy = np.cov(v10)
-        delongcov = sx / m + sy / n
-        return aucs, delongcov
-
-    y_true = np.asarray(y_true)
-    proba_a = np.asarray(proba_a)
-    proba_b = np.asarray(proba_b)
-
-    sorted_idx = np.argsort(y_true)[::-1]
-    label_1_count = int(y_true.sum())
-
-    preds_sorted = np.vstack([proba_a[sorted_idx], proba_b[sorted_idx]])
-    aucs, cov = _fastDeLong(preds_sorted, label_1_count)
-    auc_diff = aucs[0] - aucs[1]
-    se = np.sqrt(cov[0, 0] + cov[1, 1] - 2 * cov[0, 1])
-    z = auc_diff / se if se > 0 else 0.0
-    p = 2.0 * (1.0 - stats.norm.cdf(abs(z)))
-    return float(aucs[0]), float(aucs[1]), float(z), float(p)
-
 
 print("✅ DeLong test (H1 — XGBoost AUC vs baselines):")
 print(f"   {'Comparison':<40} {'AUC A':>8} {'AUC B':>8} {'z':>8} {'p-value':>10} {'sig':>5}")
@@ -859,7 +540,7 @@ comparisons = [
 ]
 
 for label, pa, pb in comparisons:
-    auc_a, auc_b, z, p = delong_test(y_test.values, pa, pb)
+    auc_a, auc_b, z, p = stats_validation.delong_test(y_test.values, pa, pb)
     sig = "✅" if p < 0.05 else "ns"
     print(f"   {label:<40} {auc_a:>8.4f} {auc_b:>8.4f} {z:>8.3f} {p:>10.4f} {sig:>5}")
 
@@ -867,17 +548,8 @@ for label, pa, pb in comparisons:
 # ─────────────────────────────────────────────────────────────
 # CELL 17 — McNemar test (classification-label disagreement only)
 # NOT for AUC comparison — for comparing which errors differ.
+# (stats_validation.mcnemar_test)
 # ─────────────────────────────────────────────────────────────
-
-def mcnemar_test(y_true, labels_a, labels_b, model_a_name, model_b_name):
-    """McNemar test on the disagreement table between two classifiers."""
-    b = int(((labels_a == 1) & (labels_b == 0) & (y_true == 1)).sum()
-           + ((labels_a == 1) & (labels_b == 0) & (y_true == 0)).sum())
-    c = int(((labels_a == 0) & (labels_b == 1) & (y_true == 1)).sum()
-           + ((labels_a == 0) & (labels_b == 1) & (y_true == 0)).sum())
-    table = [[0, b], [c, 0]]
-    result = mcnemar(table, exact=True)
-    return result.pvalue, b, c
 
 print("✅ McNemar test (classification-label disagreement — NOT AUC):")
 print(f"   {'Comparison':<40} {'b':>6} {'c':>6} {'p-value':>10} {'sig':>5}")
@@ -885,7 +557,7 @@ print("   " + "─" * 65)
 for label, pa, pb in comparisons:
     la = (pa >= 0.5).astype(int)
     lb = (pb >= 0.5).astype(int)
-    p, b, c = mcnemar_test(y_test.values, la, lb,
+    p, b, c = stats_validation.mcnemar_test(y_test.values, la, lb,
                             label.split(" vs ")[0],
                             label.split(" vs ")[1])
     sig = "✅" if p < 0.05 else "ns"
@@ -896,33 +568,8 @@ for label, pa, pb in comparisons:
 # CELL 18 — Fairness disaggregation
 # FNR, FPR, Equal Opportunity Difference by group.
 # FNR prioritised: a missed failing student gets no support.
+# (stats_validation.fairness_metrics)
 # ─────────────────────────────────────────────────────────────
-
-def fairness_metrics(y_true, y_pred, group_col, groups_df):
-    """Compute FNR and FPR per group and Equal Opportunity Difference."""
-    results = []
-    for grp in groups_df[group_col].unique():
-        mask = groups_df[group_col] == grp
-        yt = y_true[mask]
-        yp = y_pred[mask]
-        if yt.sum() == 0:
-            continue
-        tn, fp, fn, tp = confusion_matrix(yt, yp, labels=[0, 1]).ravel()
-        fnr = fn / (fn + tp) if (fn + tp) > 0 else np.nan
-        fpr = fp / (fp + tn) if (fp + tn) > 0 else np.nan
-        results.append({
-            "group": grp,
-            "n": int(mask.sum()),
-            "fail_rate": float(yt.mean()),
-            "FNR": round(fnr, 4),
-            "FPR": round(fpr, 4),
-        })
-    df_res = pd.DataFrame(results)
-    if len(df_res) > 1:
-        df_res["EqualOpportunityDiff"] = (
-            df_res["FNR"] - df_res["FNR"].min()
-        ).round(4)
-    return df_res
 
 # Disaggregate by gender + programme, and by region when available (region is a
 # context variable, not a model predictor — pulled from raw_df by test index).
@@ -936,7 +583,7 @@ y_test_arr = y_test.values
 print("✅ Fairness disaggregation (FNR prioritised):")
 for gcol in fairness_cols:
     print(f"\n   ── By {gcol} ──")
-    fair_df = fairness_metrics(y_test_arr, xgb_test_labels, gcol, test_groups)
+    fair_df = stats_validation.fairness_metrics(y_test_arr, xgb_test_labels, gcol, test_groups)
     print(fair_df.to_string(index=False))
     max_eod = fair_df["EqualOpportunityDiff"].max() if "EqualOpportunityDiff" in fair_df else 0
     if max_eod > 0.10:
@@ -948,58 +595,15 @@ for gcol in fairness_cols:
 # ─────────────────────────────────────────────────────────────
 # CELL 18.5 — Ablation study (feature-group contribution)
 # Retrain the tuned model on reduced feature sets to show each group's
-# contribution. 5-fold CV AUC-PR; preprocessing refitted inside each fold.
+# contribution. N_CV_FOLDS-fold CV AUC-PR; preprocessing refitted inside each fold.
+# (baseline_xgboost.run_ablation_study)
 # ─────────────────────────────────────────────────────────────
-def ablation_auc_pr(feature_subset):
-    """5-fold CV mean/std AUC-PR for one feature subset (no leakage)."""
-    num_sub = [c for c in feature_subset if c in ALL_NUMERIC]
-    cat_sub = [c for c in feature_subset if c in CATEGORICAL_COLS]
-    transformers = []
-    if num_sub:
-        transformers.append(("num", Pipeline([
-            ("imp", SimpleImputer(strategy="median")),
-            ("sc",  MinMaxScaler())]), num_sub))
-    if cat_sub:
-        transformers.append(("cat", Pipeline([
-            ("imp", SimpleImputer(strategy="most_frequent")),
-            ("oh",  OneHotEncoder(handle_unknown="ignore", sparse_output=False))]),
-            cat_sub))
-    pre = ColumnTransformer(transformers, remainder="drop")
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED)
-    Xsub = X[feature_subset]
-    scores = []
-    for tr_idx, te_idx in skf.split(Xsub, y):
-        Xtr = pre.fit_transform(Xsub.iloc[tr_idx])
-        Xte = pre.transform(Xsub.iloc[te_idx])
-        m = xgb.XGBClassifier(**best_xgb_params, scale_pos_weight=spw,
-                              eval_metric="aucpr", random_state=SEED,
-                              verbosity=0, use_label_encoder=False)
-        m.fit(Xtr, y.iloc[tr_idx])
-        scores.append(average_precision_score(
-            y.iloc[te_idx], m.predict_proba(Xte)[:, 1]))
-    return float(np.mean(scores)), float(np.std(scores))
-
-ABLATION_VARIANTS = {
-    "All features":           ALL_FEATURES_V2,
-    "CGPA only":              ["programme_cgpa"],
-    "No mock scores":         [f for f in ALL_FEATURES_V2 if "mock" not in f],
-    "No entry qualification": [f for f in ALL_FEATURES_V2
-                               if f not in ("wassce_aggregate", "wassce_band")],
-}
-ablation_rows = []
-for name, feats in ABLATION_VARIANTS.items():
-    mean_pr, std_pr = ablation_auc_pr(feats)
-    ablation_rows.append({
-        "variant": name,
-        "n_features": len(feats),
-        "auc_pr_mean": round(mean_pr, 4),
-        "auc_pr_std": round(std_pr, 4),
-    })
-ablation_df = pd.DataFrame(ablation_rows)
+ablation_df = baseline_xgboost.run_ablation_study(
+    X, y, ALL_NUMERIC, CATEGORICAL_COLS, ALL_FEATURES_V2, best_xgb_params, spw, SEED)
 ablation_df.to_csv(os.path.join(RESULTS_DIR, "ablation_table.csv"), index=False)
-print("✅ Ablation study (5-fold CV AUC-PR):")
+print(f"✅ Ablation study ({baseline_xgboost.N_CV_FOLDS}-fold CV AUC-PR):")
 print(ablation_df.to_string(index=False))
-print("   Saved → results/ablation_table.csv")
+print("   Saved → " + RESULTS_DIR + "/ablation_table.csv")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1012,7 +616,7 @@ config = f"""# config.yaml
 
 model:
   name: XGBoost
-  tuning: GridSearchCV (5-fold, scoring=AUC-PR)
+  tuning: GridSearchCV ({baseline_xgboost.N_CV_FOLDS}-fold, scoring=AUC-PR)
   n_estimators: {best_xgb_params.get("n_estimators")}
   max_depth: {best_xgb_params.get("max_depth")}
   learning_rate: {best_xgb_params.get("learning_rate")}
@@ -1042,13 +646,13 @@ evaluation:
   label_disagreement_test: McNemar
   calibration: BrierScore + CalibrationDisplay
   fairness_metrics: [FNR, FPR, EqualOpportunityDiff]
-  bootstrap_ci_samples: 1000
+  class_metrics: [confusion_matrix, sensitivity, specificity]
   p_threshold: 0.05
 """
 
 with open(os.path.join(RESULTS_DIR, "config.yaml"), "w") as f:
     f.write(config)
-print("✅ results/config.yaml saved — commit this to GitHub.")
+print("✅ " + RESULTS_DIR + "/config.yaml saved — commit this to GitHub.")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1057,9 +661,7 @@ print("✅ results/config.yaml saved — commit this to GitHub.")
 # Swap in real data in CELL 6 and re-run from CELL 6 onward.
 # ─────────────────────────────────────────────────────────────
 
-print("=" * 60)
-print("END-TO-END PIPELINE VERIFICATION SUMMARY")
-print("=" * 60)
+CLEAN_RUN = os.environ.get("CLEAN_RUN") == "1"
 
 checks = [
     ("Libraries imported and seeds set",         True),
@@ -1071,10 +673,11 @@ checks = [
     ("Temporal split (cohort_year present)",
      "cohort_year" in raw_df.columns),
     ("Temporal validation (past → latest cohort)",
-     "cohort_year" in raw_df.columns),
+     temporal_df is not None),
     ("Baseline models trained + evaluated",      True),
     ("Hyperparameter grid search (AUC-PR)",      True),
     ("XGBoost trained + evaluated",              True),
+    ("Class-wise metrics (confusion matrix, sensitivity/specificity)", True),
     ("Repeated-seed variance (10 runs)",         True),
     ("SHAP computed (global + per-student)",     True),
     ("SHAP dependence plots (top-3)",            True),
@@ -1088,21 +691,42 @@ checks = [
 ]
 
 all_pass = True
+checklist_lines = []
+checklist_lines.append("=" * 60)
+checklist_lines.append("END-TO-END PIPELINE VERIFICATION SUMMARY")
+checklist_lines.append("=" * 60)
+
 for label, status in checks:
     icon = "✅" if status else "⚠️ "
-    if not status: all_pass = False
-    print(f"  {icon}  {label}")
+    if not status:
+        all_pass = False
+    checklist_lines.append(f"  {icon}  {label}")
 
-print()
+checklist_lines.append("")
 if all_pass:
-    print("🎉 PIPELINE VERIFIED — ready for real data.")
-    print()
-    print("NEXT STEP:")
-    print("  1. When real anonymised data arrives, update CELL 6:")
-    print("     Uncomment: raw_df = pd.read_csv(REAL_DATA_PATH)")
-    print("     Comment out: raw_df = syn_df.copy()")
-    print("  2. Re-run from CELL 6 onward — no other changes needed.")
-    print("  3. Check class prevalence output in CELL 6 to decide")
-    print("     whether SMOTE / scale_pos_weight is actually needed.")
+    checklist_lines.append("🎉🎉 PIPELINE VERIFIED — ready for real data.🎉🎉")
+    checklist_lines.append("")
+    checklist_lines.append("NEXT STEP:")
+    checklist_lines.append("  1. When real anonymised data arrives, update CELL 6:")
+    checklist_lines.append("     Uncomment: raw_df = pd.read_csv(REAL_DATA_PATH)")
+    checklist_lines.append("     Comment out: raw_df = syn_df.copy()")
+    checklist_lines.append("  2. Re-run from CELL 6 onward — no other changes needed.")
+    checklist_lines.append("  3. Check class prevalence output in CELL 6 to decide")
+    checklist_lines.append("     whether SMOTE / scale_pos_weight is actually needed.")
 else:
-    print("⚠️  Some checks failed — review cells above.")
+    checklist_lines.append("⚠️  Some checks failed — review cells above.")
+
+checklist_content = "\n".join(checklist_lines)
+
+if CLEAN_RUN:
+    # Save the checklist details to results/<data_source>/verification_checklist.txt
+    checklist_path = os.path.join(RESULTS_DIR, "verification_checklist.txt")
+    with open(checklist_path, "w", encoding="utf-8") as f:
+        f.write(checklist_content)
+
+    if all_pass:
+        print(f"\n🎉 Stage 1 pipeline verified successfully! (Verification checklist saved → {RESULTS_DIR}/verification_checklist.txt)")
+    else:
+        print(f"\n⚠️  Stage 1 pipeline verification checks had warnings. (Details saved → {RESULTS_DIR}/verification_checklist.txt)")
+else:
+    print(checklist_content)

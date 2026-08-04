@@ -1,9 +1,15 @@
 """
-inference.py — load the trained model bundle and score student records.
+prediction.py — load a trained model bundle and score student records.
 
-The bundle (results/inference_bundle.pkl) is produced by Stage 1 and carries the
-model, the fitted preprocessor, and the exact engineer_features function used in
-training — so scoring here reproduces the training-time transform precisely.
+Moved from app/inference.py to the repo root: this logic is generic (it only
+consumes the exported bundle dict) and is shared by the Streamlit app
+(app/app.py) and, going forward, anything in the evaluation pipeline that
+needs to run predictions against an exported bundle.
+
+The bundle is produced by Stage 1/2 (notebooks/01, notebooks/02) and carries
+the model, the fitted preprocessor, and the exact engineer_features function
+used in training — so scoring here reproduces the training-time transform
+precisely.
 """
 from pathlib import Path
 
@@ -12,22 +18,50 @@ import numpy as np
 import pandas as pd
 import shap
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-BUNDLE_PATH = REPO_ROOT / "results" / "inference_bundle.pkl"
+REPO_ROOT = Path(__file__).resolve().parent
+RESULTS_ROOT = REPO_ROOT / "results"
 
 RISK_PROB_COLUMN = "fail_probability"
 RANK_COLUMN = "risk_rank"
 STUDENT_ID_COLUMN = "student_id"
 
 
-def load_bundle(path=BUNDLE_PATH):
-    """Load the inference bundle. Raises FileNotFoundError if Stage 1 hasn't run.
-
-    Safe pickle use: this file is produced locally by our own Stage 1 run
-    (results/inference_bundle.pkl), never fetched from an external/untrusted
-    source. cloudpickle is required because the bundle holds the live
-    engineer_features function, not just plain data.
+def save_bundle(bundle: dict, path):
     """
+    cloudpickle-dump an inference bundle, registering nmcle_schema for
+    BY-VALUE serialisation first so the bundle stays self-contained (the app
+    then reproduces the training-time transform without nmcle_schema.py on
+    its path — see load_bundle's docstring for why cloudpickle, not pickle).
+    """
+    import nmcle_schema
+    cloudpickle.register_pickle_by_value(nmcle_schema)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "wb") as f:
+        cloudpickle.dump(bundle, f)
+
+
+def resolve_bundle_path():
+    """
+    Prefer the real-data bundle once it exists; fall back to the synthetic
+    one otherwise. This is what lets the app (and any comparison code)
+    automatically start serving the real model the moment Stage 1/2 have
+    been re-run on real data, with no manual path change.
+    """
+    real_path = RESULTS_ROOT / "real" / "inference_bundle.pkl"
+    if real_path.exists():
+        return real_path
+    return RESULTS_ROOT / "synthetic" / "inference_bundle.pkl"
+
+
+def load_bundle(path=None):
+    """Load the inference bundle. Raises FileNotFoundError if no stage has run.
+
+    Safe pickle use: this file is produced locally by our own pipeline run,
+    never fetched from an external/untrusted source. cloudpickle is required
+    because the bundle holds the live engineer_features function, not just
+    plain data.
+    """
+    path = path or resolve_bundle_path()
     if not Path(path).exists():
         raise FileNotFoundError(
             f"No model bundle at {path}. Run ./run.sh (or run_all.py) first."

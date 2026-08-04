@@ -45,4 +45,4 @@ if [ ! -x "$PYTHON_BIN" ]; then
 fi
 
 echo "Running the full analysis — outputs will appear in results/ ..."
-"$PYTHON_BIN" run_all.py
+"$PYTHON_BIN" run_all.py "$@"

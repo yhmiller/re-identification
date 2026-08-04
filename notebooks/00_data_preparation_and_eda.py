@@ -78,10 +78,19 @@ EXCLUDE_STATUSES = ["ABSENT", "DEFERRED", "WITHHELD", "INCOMPLETE", "PENDING"]
 #   "papers"  → fail = 1 if papers_failed >= 1
 TARGET_RULE = "status"                              # ← EDIT if needed
 
-NMC_SUBJECTS = ["medical_surgical", "mental_health", "paediatric",
-                "public_health", "obstetric", "pharmacology"]
-CA_COLS   = [f"ca_{s}" for s in NMC_SUBJECTS]
-MOCK_COLS = [f"mock_{s}" for s in NMC_SUBJECTS]
+# Subjects and per-subject columns come from the single source of truth,
+# nmcle_schema.py at the repo root (edit exam papers there, not here).
+import os
+import sys
+
+try:
+    _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if _repo_root not in sys.path:
+        sys.path.insert(0, _repo_root)
+except NameError:
+    pass  # __file__ is undefined in a pasted Colab cell — rely on the cwd
+
+from nmcle_schema import NMC_SUBJECTS, CA_COLS, MOCK_COLS
 
 print("✅ Config set. Edit COLUMN_MAPPING after inspecting the real file.")
 
@@ -203,6 +212,7 @@ else:
 # A fixed study salt: prevents anyone re-hashing known index numbers
 # to re-identify rows. Keep this string PRIVATE (do not publish).
 STUDY_SALT = "MILLER-22388461-NMCLE-2026"          # ← keep private
+# #TODO - Read from .env - untracked file
 
 def pseudonymise(value: str) -> str:
     return hashlib.sha256((STUDY_SALT + str(value)).encode()).hexdigest()[:16]
@@ -287,11 +297,15 @@ for gcol in ["programme_type", "gender", "age_band", "cohort_year"]:
 # EDA-CELL 4 — Score distributions by outcome (figure)
 # ─────────────────────────────────────────────────────────────
 
-fig, axes = plt.subplots(1, 3, figsize=(16, 4.5))
-plot_cols = [("programme_cgpa", "Programme CGPA"),
-             ("wassce_aggregate", "WASSCE Aggregate")]
 df["_mock_avg"] = df[MOCK_COLS].mean(axis=1)
-plot_cols.append(("_mock_avg", "Mock Exam Average"))
+candidate_cols = [("programme_cgpa", "Programme CGPA"),
+                  ("wassce_aggregate", "WASSCE Aggregate"),
+                  ("_mock_avg", "Mock Exam Average")]
+plot_cols = [(c, t) for c, t in candidate_cols if c in df.columns]
+
+fig, axes = plt.subplots(1, len(plot_cols), figsize=(5.4 * len(plot_cols), 4.5),
+                          squeeze=False)
+axes = axes.ravel()
 
 for ax, (col, title) in zip(axes, plot_cols):
     for val, lab, color in [(0, "Pass", "#2E7D32"), (1, "Fail", "#C62828")]:

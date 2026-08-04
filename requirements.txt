@@ -41,3 +41,6 @@ cloudpickle==2.2.1       # serialises the inference bundle (model + transform)
 
 # Educator screening app (Phase 2)
 streamlit==1.40.2
+
+# Manuscript tooling (scripts/md2docx.py, scripts/read_docx.py) - i will remove it after
+python-docx==1.2.0

@@ -13,8 +13,9 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import inference  # noqa: E402 — local module, added to path above
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # repo root, for prediction
+sys.path.insert(0, str(Path(__file__).resolve().parent))          # app/, for labels
+import prediction  # noqa: E402 — repo-root module, added to path above
 import labels      # noqa: E402 — plain-English names + glossary
 
 DEFAULT_THRESHOLD = 0.50
@@ -33,9 +34,9 @@ PROGRAMME = "MSc Health Informatics, 2025-2026"
 ABOUT_MD = f"""### {APP_TITLE}
 
 Explainable machine learning for predicting **Nursing & Midwifery Council
-Licensure Examination (NMC-LE)** failure in Ghana — an **XGBoost + SHAP**
+Licensure Examination (NMC-LE)** failure in Ghana - an **XGBoost + SHAP**
 approach. It screens nursing trainees for first-attempt failure risk so
-educators can target remediation early. Decision support only — not a verdict.
+educators can target remediation early. Decision support only - not a verdict.
 
 **Researcher:** {RESEARCHER}
 
@@ -63,7 +64,7 @@ HIDE_BRANDING_CSS = """
 
 @st.cache_resource
 def get_bundle():
-    return inference.load_bundle()
+    return prediction.load_bundle()
 
 
 def read_upload(uploaded_file):
@@ -78,7 +79,7 @@ def render_header():
     st.caption(
         "Identify nursing trainees at risk of failing the licensure exam, "
         "so remediation can start early. Predictions are model estimates, not "
-        "verdicts — use them alongside your own judgement."
+        "verdicts - use them alongside your own judgement."
     )
 
 
@@ -86,11 +87,9 @@ def render_data_warning(bundle):
     """Show an illustrative-only banner until the model is trained on real data."""
     if bundle.get("data_source", "synthetic") != "real":
         st.warning(
-            "**Demonstration mode** — this model is trained on **synthetic "
-            "pilot data**. The risk scores are illustrative only and must not be "
-            "used for real student decisions. The banner disappears automatically "
-            "once the model is retrained on the real college dataset.",
-            icon="⚠️",
+            "**Trying to train the model** :::  **synthetic & public data**"
+            " The Progress: *IT WORKS!.* I'm still trying to improve the model performance "
+            "",
         )
 
 
@@ -103,7 +102,7 @@ def render_sidebar(bundle):
     )
     st.sidebar.download_button(
         "Download blank template (.csv)",
-        inference.blank_template(bundle).to_csv(index=False),
+        prediction.blank_template(bundle).to_csv(index=False),
         file_name="student_records_template.csv",
         mime="text/csv",
     )
@@ -138,12 +137,12 @@ def render_summary(scored):
 
 def render_results_table(scored, bundle):
     display = scored.copy()
-    display[inference.RISK_PROB_COLUMN] = display[inference.RISK_PROB_COLUMN].map(
+    display[prediction.RISK_PROB_COLUMN] = display[prediction.RISK_PROB_COLUMN].map(
         PROB_PERCENT_FORMAT.format
     )
     display["at_risk"] = display["at_risk"].map({True: "Yes", False: "No"})
-    shown = [inference.RANK_COLUMN, inference.STUDENT_ID_COLUMN,
-             inference.RISK_PROB_COLUMN, "at_risk"] + bundle["categorical_columns"]
+    shown = [prediction.RANK_COLUMN, prediction.STUDENT_ID_COLUMN,
+             prediction.RISK_PROB_COLUMN, "at_risk"] + bundle["categorical_columns"]
     display = display[shown].rename(columns=labels.RESULT_HEADERS)
     st.dataframe(display, use_container_width=True, hide_index=True)
 
@@ -210,11 +209,11 @@ def _natural_summary(chosen, prob, at_risk, raises, lowers):
 
 def render_explanation(scored, bundle):
     st.subheader("Why was a student flagged?")
-    ids = scored[inference.STUDENT_ID_COLUMN].tolist()
+    ids = scored[prediction.STUDENT_ID_COLUMN].tolist()
     chosen = st.selectbox("Select a student", ids)
 
-    row = scored[scored[inference.STUDENT_ID_COLUMN] == chosen]
-    prob = float(row[inference.RISK_PROB_COLUMN].iloc[0])
+    row = scored[scored[prediction.STUDENT_ID_COLUMN] == chosen]
+    prob = float(row[prediction.RISK_PROB_COLUMN].iloc[0])
     at_risk = bool(row["at_risk"].iloc[0])
     st.markdown(
         f"**{chosen}** has an estimated **{PROB_PERCENT_FORMAT.format(prob)}** chance of "
@@ -222,8 +221,8 @@ def render_explanation(scored, bundle):
         "The factors behind this:"
     )
 
-    raw_row = row[inference.required_raw_columns(bundle)]
-    contributions = inference.explain_student(raw_row, bundle)
+    raw_row = row[prediction.required_raw_columns(bundle)]
+    contributions = prediction.explain_student(raw_row, bundle)
     contributions["label"] = contributions["feature"].map(labels.humanize_feature)
     max_abs = contributions["shap_value"].abs().max()
 
@@ -257,7 +256,9 @@ def render_explanation(scored, bundle):
         st.bar_chart(contributions.set_index("label")["shap_value"])
 
 
-RESULTS_DIR = inference.REPO_ROOT / "results"
+# Matches whichever bundle got loaded (real once it exists, else synthetic)
+# so the comparison table and figures shown always agree with the served model.
+RESULTS_DIR = prediction.resolve_bundle_path().parent
 
 # ── Model-insight side drawer ──
 INSIGHT_STATE_KEY = "show_model_insight"
@@ -319,6 +320,10 @@ DRAWER_CSS = f"""
     </style>
 """
 
+# Baseline-vs-pruned comparison table (produced by Stage 1) — the headline
+# E-XGBoost result: does SHAP pruning preserve performance on a leaner feature set?
+COMPARISON_TABLE = "comparison_table.csv"
+
 # Cohort-wide figures (produced by Stage 1) with plain-English captions, mirroring
 # the "Seeing the model think" section of the project portfolio.
 MODEL_FIGURES = [
@@ -343,10 +348,28 @@ def close_model_insight():
     st.session_state[INSIGHT_STATE_KEY] = False
 
 
+def _render_comparison_table():
+    """TABLE 1 — baseline XGBoost vs the SHAP-pruned E-XGBoost."""
+    path = RESULTS_DIR / COMPARISON_TABLE
+    if not path.exists():
+        return
+    st.markdown("**TABLE 1 - XGBoost (Baseline) vs E-XGBoost (Engineered)**")
+    st.caption("SHAP-guided pruning keeps only the features that jointly explain 95% "
+               "of the model's decisions. The test: does the leaner model match the "
+               "full one? Scores are mean ± SD over 10-fold cross-validation × 10 seeds.")
+    st.table(pd.read_csv(path))
+    st.caption("Δ Change is E-XGBoost minus baseline; p-values are Wilcoxon signed-rank "
+               "on the paired per-fold scores, with Cohen's *d* effect size. Here the "
+               "pruned model matches the baseline on every metric while using far fewer "
+               "features — the parsimony result E-XGBoost is meant to show.")
+
+
 def _render_insight_body():
     """Cohort-wide figures mirroring the portfolio's 'Seeing the model think' section."""
     st.caption("Cohort-wide views of the model behind the scores above. These are "
                "illustrative - generated on the current synthetic model.")
+
+    _render_comparison_table()
 
     for fname, title, desc in MODEL_FIGURES:
         path = RESULTS_DIR / fname
@@ -371,7 +394,7 @@ def render_model_insight():
     """A right-side drawer mirroring the portfolio's 'Seeing the model think' section."""
     st.session_state.setdefault(INSIGHT_STATE_KEY, False)
 
-    st.button("🧠 Seeing the model think — how it reaches these scores",
+    st.button("🧠 Seeing the model think - how it reaches these scores? Click Mee!",
               on_click=open_model_insight)
 
     if not st.session_state[INSIGHT_STATE_KEY]:
@@ -381,7 +404,7 @@ def render_model_insight():
     st.markdown('<div class="insight-overlay"></div>', unsafe_allow_html=True)
 
     with st.container(key=INSIGHT_DRAWER_KEY):
-        st.markdown("### 🧠 Seeing the model think")
+        st.markdown("### Seeing the model think")
         st.button("✕ Close", on_click=close_model_insight, key="close_insight_drawer")
         _render_insight_body()
 
@@ -419,11 +442,11 @@ def main():
         st.info("Upload a spreadsheet to begin, or download the template from the sidebar.")
     else:
         raw_df = read_upload(uploaded)
-        missing = inference.missing_columns(raw_df, bundle)
+        missing = prediction.missing_columns(raw_df, bundle)
         if missing:
             st.error(f"The file is missing required columns: {missing}")
         else:
-            scored = inference.score_students(raw_df, bundle, threshold)
+            scored = prediction.score_students(raw_df, bundle, threshold)
             render_summary(scored)
             render_results_table(scored, bundle)
             render_explanation(scored, bundle)
