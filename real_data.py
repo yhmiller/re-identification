@@ -24,7 +24,9 @@ SHEET = "model_data"
 
 # The build script writes the outcome under this name; the pipeline expects
 # schema.TARGET. Renaming here keeps the Excel file readable to the registrar.
-OUTCOME_SOURCE_COLUMN = "nmcle_fail"
+# Council-neutral: this cohort is examined by the Allied Health Professions
+# Council, not the Nursing and Midwifery Council.
+OUTCOME_SOURCE_COLUMN = "licensure_fail"
 
 
 class OutcomeNotSuppliedError(RuntimeError):
