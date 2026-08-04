@@ -35,6 +35,10 @@ GPA_COLS = [f"gpa_sem{i}" for i in SEMESTERS]
 GRADE_LETTERS = list("ABCDE")
 GRADE_COUNT_COLS = [f"n_grade_{g}" for g in GRADE_LETTERS]
 
+# Credits attempted per semester. Present in the real dataset, absent from pilot
+# data and the alpha corpus, so every use must tolerate their absence.
+CREDIT_COLS = [f"credits_sem{i}" for i in SEMESTERS]
+
 # Grades A to D are passes; E is a fail. The college records no F.
 PASS_LETTERS = set("ABCD")
 FAIL_LETTERS = set("E")
@@ -59,6 +63,15 @@ ALL_FEATURES = NUMERIC_COLS + CATEGORICAL_COLS
 TARGET = "fail"
 
 
+def _weighted_mean(values, weights):
+    return (values * weights).sum(axis=1) / weights.sum(axis=1)
+
+
+def _weighted_std(values, weights, mean):
+    deviation = values.sub(mean, axis=0) ** 2
+    return np.sqrt((deviation * weights).sum(axis=1) / weights.sum(axis=1))
+
+
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     """Add derived features, all computable before the licensure examination.
 
@@ -68,12 +81,26 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     gpas = df[GPA_COLS]
 
-    df["gpa_mean"] = gpas.mean(axis=1)
+    # Semester 4 is a low-credit term in this cohort (6 credits against 20-24
+    # elsewhere), so an unweighted mean gives it 1/6 of the weight against its
+    # 7.5% share of credits. Weighting by credits is what CGPA itself does.
+    # Pilot data and the alpha corpus carry no per-semester credits, so both
+    # measures fall back to unweighted there.
+    has_credits = all(col in df.columns for col in CREDIT_COLS)
+    if has_credits:
+        weights = df[CREDIT_COLS].fillna(0.0)
+        weights.columns = GPA_COLS          # align for the elementwise product
+        df["gpa_mean"] = _weighted_mean(gpas, weights)
+        df["gpa_consistency"] = _weighted_std(gpas, weights, df["gpa_mean"])
+    else:
+        df["gpa_mean"] = gpas.mean(axis=1)
+        df["gpa_consistency"] = gpas.std(axis=1)
+
+    # Extrema name the weakest and strongest semester; weighting an extremum is
+    # not meaningful, so these stay unweighted. The semester-4 quantisation does
+    # push gpa_max to 4.0 often, which is a known limitation.
     df["gpa_min"] = gpas.min(axis=1)
     df["gpa_max"] = gpas.max(axis=1)
-
-    # Low spread means a steady student; a high spread means one who swings.
-    df["gpa_consistency"] = gpas.std(axis=1)
 
     # Positive trend means the student was improving into their final year,
     # which matters more than the average for a candidate sitting soon.
