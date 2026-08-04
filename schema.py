@@ -68,8 +68,13 @@ def _weighted_mean(values, weights):
 
 
 def _weighted_std(values, weights, mean):
+    # Reliability-weights denominator (Sw - Sw^2/Sw), not Sw, so that equal
+    # weights reduce exactly to pandas' ddof=1 sample std used by the
+    # unweighted fallback rather than a ddof=0 population std.
     deviation = values.sub(mean, axis=0) ** 2
-    return np.sqrt((deviation * weights).sum(axis=1) / weights.sum(axis=1))
+    weight_sum = weights.sum(axis=1)
+    denominator = weight_sum - (weights ** 2).sum(axis=1) / weight_sum
+    return np.sqrt((deviation * weights).sum(axis=1) / denominator)
 
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -90,6 +95,10 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     if has_credits:
         weights = df[CREDIT_COLS].fillna(0.0)
         weights.columns = GPA_COLS          # align for the elementwise product
+        # A missing gpa_sem with a present credits_sem would otherwise drop
+        # from the numerator (skipna) but stay in the denominator, biasing
+        # the mean. Zero its weight so it drops from both, like .mean() does.
+        weights = weights.where(gpas.notna(), 0.0)
         df["gpa_mean"] = _weighted_mean(gpas, weights)
         df["gpa_consistency"] = _weighted_std(gpas, weights, df["gpa_mean"])
     else:
