@@ -121,8 +121,14 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+# gpa_mean is deliberately absent. Once credit-weighted it reduces to
+# sum(grade_points) / sum(credits), which is exactly how the registry computes
+# cgpa — measured correlation 1.000000 on the 2021/2022 cohort. Two identical
+# predictors make SHAP split attribution between them arbitrarily, so only cgpa
+# is carried. engineer_features still computes gpa_mean, because the workbook is
+# read by humans who expect the column.
 ENGINEERED_NUMERIC = [
-    "gpa_mean", "gpa_min", "gpa_max", "gpa_consistency",
+    "gpa_min", "gpa_max", "gpa_consistency",
     "gpa_trend", "gpa_final_half", "gpa_first_half",
     "n_weak_semesters", "n_failed", "fail_rate",
 ] + [f"weak_sem{i}" for i in SEMESTERS] \
