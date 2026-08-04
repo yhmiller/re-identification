@@ -66,6 +66,15 @@ NOISE_SD_ALPHA = 2.5
 #     0.5 -> 0.9417   1.0 -> 0.9256   1.5 -> 0.8745   2.0 -> 0.8096
 #     2.5 -> 0.7528   3.0 -> 0.6711   3.5 -> 0.6720   4.0 -> 0.6282   4.5 -> 0.5645
 # 2.5 is used, landing nearest 0.78, mid-band for published licensure models.
+#
+# That "nearest" call is close, not clean: 2.5 (|0.7528-0.78|=0.0272) beat 2.0
+# (|0.8096-0.78|=0.0296) by only 0.0024. The grid itself is non-monotonic
+# between 3.0 and 3.5 (0.6711 then 0.6720, a 0.0009 reversal against an
+# otherwise decreasing trend), so a single-seed AUC at one grid point carries
+# noise on roughly that same order — comparable to the margin that decided
+# 2.5 over 2.0. Read the choice between 2.0 and 2.5 as within noise, not as a
+# meaningful preference: 1.5, 2.0 and 2.5 all satisfy the plausibility gate,
+# and 2.5 is a defensible pick, not a measured optimum.
 NOISE_SD_REAL_110 = 2.5
 
 # Published licensure-prediction models cluster in this band. A corpus that
