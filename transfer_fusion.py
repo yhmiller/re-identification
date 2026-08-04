@@ -60,8 +60,13 @@ def generate_source(X_train, y_train, target_col, categorical_cols, seed,
     """
     frame = X_train.copy()
     frame[target_col] = y_train.values
+    # SHAP pruning can remove a categorical from the feature subset, so the
+    # caller's categorical list may name columns this fold's frame no longer
+    # has. Intersect, as _build_preprocessor already does, or the synthesiser
+    # is told to model a column that is not there.
+    present = [c for c in categorical_cols if c in frame.columns]
     replica = synthetic_data.generate_field_replica(
-        frame, target_col, categorical_cols, seed,
+        frame, target_col, present, seed,
         n_rows=int(len(frame) * multiplier))
     return replica.drop(columns=[target_col]), replica[target_col]
 
