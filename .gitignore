@@ -13,7 +13,7 @@ raw_college_records.*
 # Manuscript drafts, ethics paperwork, questionnaires, and the reference
 # thesis collection. These carry consent forms and third-party student work.
 /proposal
-/docs
+/docs/*
 /local
 
 # Generated artefacts. Every one is reproducible with ./run.sh.
@@ -41,3 +41,11 @@ Thumbs.db
 # despite the /docs rule above.
 !docs/E-XGBoost-technical-documentation.md
 !docs/TODO.md
+# Aggregate findings only. No record-level result, no identifier, no student
+# name or index number appears anywhere in it.
+!docs/disclosure-risk-findings.md
+
+# The *linkage* rule above exists to keep the SID-to-index linkage table out of
+# git. It also catches this analysis script by name. The script contains code,
+# not data, so it is tracked.
+!notebooks/06_linkage_attack.py
