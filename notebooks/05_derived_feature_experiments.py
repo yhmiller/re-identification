@@ -32,29 +32,19 @@ sys.path.insert(0, str(ROOT))
 import attack_models as am  # noqa: E402
 import deidentify as di  # noqa: E402
 import disclosure_risk as dr  # noqa: E402
+import strata as st  # noqa: E402
 
 RESULTS = ROOT / "results" / "disclosure"
 RESULTS.mkdir(parents=True, exist_ok=True)
 
-SEMESTERS = [f"gpa_sem{i}" for i in range(1, 7)]
-BAND_WIDTHS = [0.25, 0.5, 1.0]
 
 
-def load_strata():
-    allied = pd.read_excel(ROOT / "data" / "model_dataset_2021_2022.xlsx")
-    allied["group"] = (
-        allied["programme"].astype(str) + "-" + allied["cohort_year"].astype(str)
-    )
-
-    nursing = pd.read_excel(
-        ROOT / "data" / "consolidated_nursing.xlsx", sheet_name="students"
-    )
-    nursing["group"] = "NUR-" + nursing["intake_year"].astype(str)
-
-    return {"allied_health": allied, "nursing": nursing}
+ROLES = {"allied_health": "study population",
+         "nursing": "study population",
+         "public": "replication corpus"}
 
 
-def experiment_a(name, frame):
+def experiment_a(name, frame, SEMESTERS):
     """Derived features alone, raw sequence withheld."""
     derived = di.derive_features(frame, SEMESTERS)
     combined = frame[["group"]].join(derived)
@@ -83,7 +73,7 @@ def experiment_a(name, frame):
     return pd.DataFrame(rows)
 
 
-def experiment_b(name, frame):
+def experiment_b(name, frame, SEMESTERS, BAND_WIDTHS):
     """Generalise the sequence, publish derived features at full precision, attack."""
     truth = frame[SEMESTERS]
     derived = di.derive_features(frame, SEMESTERS)[di.CONSTRAINING_COLUMNS]
@@ -123,7 +113,7 @@ def experiment_b(name, frame):
     return pd.DataFrame(rows)
 
 
-def experiment_c(name, frame):
+def experiment_c(name, frame, SEMESTERS, BAND_WIDTHS):
     """Recompute derived features from the generalised data instead."""
     rows = []
     for width in BAND_WIDTHS:
@@ -161,13 +151,14 @@ def experiment_c(name, frame):
 
 
 def main():
-    strata = load_strata()
     a_all, b_all, c_all = [], [], []
 
-    for name, frame in strata.items():
-        print(f"\n{'=' * 74}\n{name}: {len(frame)} students\n{'=' * 74}")
+    for name, stratum in st.load_all().items():
+        frame, SEMESTERS = stratum.frame, stratum.sequence
+        print(f"\n{'=' * 74}\n{name} ({ROLES[name]}): {len(frame)} students, "
+              f"{len(SEMESTERS)}-position sequence\n{'=' * 74}")
 
-        a = experiment_a(name, frame)
+        a = experiment_a(name, frame, SEMESTERS)
         a_all.append(a)
         print("EXPERIMENT A  does a summary-only release protect anyone?")
         print(f"  {'release':<32}{'attrs':>7}{'unique':>9}{'min k':>7}")
@@ -177,7 +168,7 @@ def main():
                 f"{r['prop_unique']:>8.1%}{r['min_class_size']:>7}"
             )
 
-        b = experiment_b(name, frame)
+        b = experiment_b(name, frame, SEMESTERS, stratum.band_widths)
         b_all.append(b)
         print("\nEXPERIMENT B  do derived features reverse generalisation?")
         print(
@@ -194,7 +185,7 @@ def main():
                 f"{r['containment_check']:>7.0%}"
             )
 
-        c = experiment_c(name, frame)
+        c = experiment_c(name, frame, SEMESTERS, stratum.band_widths)
         c_all.append(c)
         print("\nEXPERIMENT C  recomputing derived features from the bands")
         print(

@@ -6,7 +6,20 @@ Compiled: 16 August 2026
 
 ## Title
 
+**Current, in use:**
+
 Re-identification Risk in Ghanaian Health Professions Education Records: Do Derived Features Undermine De-identification?
+
+**Proposed, not yet adopted:**
+
+Derivation-Consistent Anonymisation for Re-identification Risk in Health Professions Education Records Using Hybrid Public and Institutional Academic Data
+
+The proposed title follows the Q1 methods template formula, which requires the
+manuscript to name one engineered artefact rather than a question, and to signal
+hybrid public plus field data. Switching to it commits the study to the single
+engineering operation described in `NewDirection/writing-plan.md`. Do not adopt
+it until that framing is agreed, because the title, the objectives and Section 8
+of the methods must match or the manuscript is desk-rejected on the mismatch.
 
 Short title: Re-identification risk in Ghanaian nursing education records
 

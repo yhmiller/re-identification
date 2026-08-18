@@ -26,56 +26,46 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import risk_utility as ru  # noqa: E402
+import strata as st  # noqa: E402
 
 RESULTS = ROOT / "results" / "disclosure"
 RESULTS.mkdir(parents=True, exist_ok=True)
 
-SEMESTERS = [f"gpa_sem{i}" for i in range(1, 7)]
-WEAK_QUANTILE = 0.40
-TARGET = "weak_final"
+TARGET = st.SENSITIVE
+
+ROLES = {"allied_health": "study population",
+         "nursing": "study population",
+         "public": "replication corpus"}
 
 
-def load_strata():
-    allied = pd.read_excel(ROOT / "data" / "model_dataset_2021_2022.xlsx")
-    allied[TARGET] = (
-        allied["gpa_sem6"] < allied["gpa_sem6"].quantile(WEAK_QUANTILE)
-    ).astype(int)
-
-    nursing = pd.read_excel(
-        ROOT / "data" / "consolidated_nursing.xlsx", sheet_name="students"
-    )
-    last = nursing[SEMESTERS].ffill(axis=1).iloc[:, -1]
-    nursing[TARGET] = (last < last.quantile(WEAK_QUANTILE)).astype(int)
-
-    return {
-        # Predict the sixth semester from the first five.
-        "allied_health": (allied, [f"gpa_sem{i}" for i in range(1, 6)]),
-        # Nursing coverage thins after position 2, so the first two positions
-        # are the only predictors available to most students.
-        "nursing": (nursing, ["gpa_sem1", "gpa_sem2"]),
-    }
 
 
-CONFIGS = [
-    ("original, no protection", None, None, "none"),
-    ("band 0.25", 0.25, None, "none"),
-    ("band 0.50", 0.50, None, "none"),
-    ("band 1.00", 1.00, None, "none"),
-    ("band 0.50 + suppress k<3", 0.50, 3, "none"),
-    ("band 0.50 + suppress k<5", 0.50, 5, "none"),
-    ("band 0.50 + derived from originals", 0.50, None, "leaky"),
-    ("band 0.50 + derived from bands", 0.50, None, "safe"),
-    ("band 1.00 + derived from originals", 1.00, None, "leaky"),
-    ("band 1.00 + derived from bands", 1.00, None, "safe"),
-]
+def configs_for(stratum):
+    """Release configurations, with band widths scaled to the corpus."""
+    narrow, mid, wide = stratum.band_widths
+    return [
+        ("original, no protection", None, None, "none"),
+        (f"band {narrow:g}", narrow, None, "none"),
+        (f"band {mid:g}", mid, None, "none"),
+        (f"band {wide:g}", wide, None, "none"),
+        (f"band {mid:g} + suppress k<3", mid, 3, "none"),
+        (f"band {mid:g} + suppress k<5", mid, 5, "none"),
+        (f"band {mid:g} + derived from originals", mid, None, "leaky"),
+        (f"band {mid:g} + derived from bands", mid, None, "safe"),
+        (f"band {wide:g} + derived from originals", wide, None, "leaky"),
+        (f"band {wide:g} + derived from bands", wide, None, "safe"),
+    ]
 
 
 def main():
     all_rows = []
 
-    for name, (frame, predictors) in load_strata().items():
+    for name, stratum in st.load_all().items():
+        frame = stratum.frame
+        predictors = stratum.predictors
+        SEMESTERS = stratum.sequence
         print(
-            f"\n{'=' * 86}\n{name}: {len(frame)} students, "
+            f"\n{'=' * 86}\n{name} ({ROLES[name]}): {len(frame)} students, "
             f"predictors {', '.join(predictors)}\n{'=' * 86}"
         )
         print(
@@ -84,7 +74,7 @@ def main():
         )
 
         rows = []
-        for label, width, suppress_k, mode in CONFIGS:
+        for label, width, suppress_k, mode in configs_for(stratum):
             row = ru.frontier_row(
                 frame,
                 SEMESTERS,

@@ -1,68 +1,93 @@
 # Project Guide
 
 Thesis-side companion to the [README](README.md). The README covers what the
-code is and how to run it; this file covers how the outputs map onto the
-thesis, and the decisions already settled so they are not re-litigated.
+code is and how to run it; this file covers how the outputs map onto the thesis,
+and the decisions already settled so they are not re-litigated.
 
 Prince Bortey Miller | 22388461 | Supervision Code 289
 Supervisor: Dr. Eric Opoku Osei | KNUST, 2026
 
-Two companion records carry the detail behind the decisions below:
-[real-data-migration-findings.md](docs/real-data-migration-findings.md) is
-authoritative on the data, and
-[literature-review-findings.md](docs/literature-review-findings.md) is
-authoritative on sources.
+Authoritative record of what has been measured:
+[docs/disclosure-risk-findings.md](docs/disclosure-risk-findings.md).
 
 ---
 
-## Study population
+## Scope
 
-The delivered records are **Accra School of Hygiene, Korle-Bu**: 110 students
-across Environmental Health, Occupational Health and Safety, and Occupational
-Therapy, cohorts 2021 and 2022. These are allied health professions regulated
-by Ghana's Allied Health Professions Council, not the Nursing and Midwifery
-Council.
+The study measures **re-identification risk in health professions education
+records**, and asks whether the engineered features a machine learning pipeline
+derives from those records undo the de-identification applied to their source.
 
-The research question, the method and the engineering contribution are
-unchanged by this. The title, the examining council and the population framing
-are not. Draft in the allied-health framing from the first sentence rather than
-writing nursing prose and retrofitting it.
+It replaced an earlier study that predicted licensure failure from the same
+records. That study could not proceed: the Accra School of Hygiene registrar
+never returned the outcome column, and without a dependent variable nothing
+could be estimated. The present study has no dependent variable at all, so the
+same blockage cannot recur.
+
+Nothing from the earlier scope was deleted. The pre-pivot codebase is tagged
+`scope/licensure-prediction`, and the outcome-simulation tooling sits in
+[archive/licensure-outcome/](archive/licensure-outcome/) with a README
+explaining what each file was for.
 
 ---
 
-## Getting real results
+## Corpora
 
-Data preparation is two scripts, not Stage 0.
+Three, deliberately never pooled. Grading scales, grade-point definitions and
+sequence lengths all differ, so a merged corpus would confound every comparison
+drawn from it. Specifications live in [strata.py](strata.py).
+
+| | Role | n | Source |
+|---|---|---|---|
+| `allied_health` | study population | 110 | Accra School of Hygiene, EH/OHS/OT, 2021-2022 |
+| `nursing` | study population | 566 | BSc Nursing, 2023/24 and 2024/25, levels 200-400 |
+| `public` | replication corpus | 649 | UCI Student Performance (Cortez & Silva, 2008) |
+
+**The public corpus is not part of the study population.** It is Portuguese
+secondary school students in a language course: not health, not professional,
+not tertiary. It is present to test whether the mechanism reproduces outside the
+study population, and for no other purpose. No claim about health records, about
+Ghanaian institutions or about Act 843 rests on it.
+
+An earlier decision rejected this corpus as a comparator for licensure
+prediction, because Portuguese secondary students do not clear the "genuinely
+comparable" bar for a health professions topic. That decision stands. It
+addressed a different use: transfer learning for prediction needs comparable
+populations, whereas a leak in an order statistic does not. `gpa_min` is the
+minimum of the sequence regardless of who the student is.
+
+---
+
+## Getting results
 
 ```bash
-ml_env/bin/python scripts/consolidate_real_data.py   # workbooks -> tidy dataset
-ml_env/bin/python scripts/build_model_dataset.py     # tidy -> model-ready
-./run.sh                                             # Stage 1 + Stage 2
+ml_env/bin/python scripts/consolidate_real_data.py        # allied health workbooks
+ml_env/bin/python scripts/consolidate_nursing_data.py     # nursing workbooks
+ml_env/bin/python notebooks/04_disclosure_risk.py         # Phases 1 and 2
+ml_env/bin/python notebooks/05_derived_feature_experiments.py  # Phase 3
+ml_env/bin/python notebooks/06_linkage_attack.py          # Phase 4
+ml_env/bin/python notebooks/07_risk_utility_frontier.py   # Phase 5
 ```
 
-The pipeline detects the outcome column automatically. While `licensure_fail` in
-`data/model_dataset_2021_2022.xlsx` is empty it runs on pilot data and writes
-to `results/synthetic/`; once the college populates it, the same command trains
-on real records and writes to `results/real/`. No flags, no edits.
+Outputs land in `results/disclosure/`. Every output is aggregate. No function in
+`disclosure_risk`, `deidentify`, `attack_models` or `risk_utility` returns
+record-level results, so no re-identified student can leave the pipeline.
 
-Adding cohorts means dropping new workbooks in, pointing `SOURCE_DIR` in
-`consolidate_real_data.py` at them, and re-running both scripts. Student
-identifiers derive from cohort, programme and source row, so existing ones stay
-stable and outcomes already collected do not shift.
+---
 
-### Blocking
+## Identifiers
 
-- **The outcome column is empty.** The college will supply it for 2021/22.
-- **One examination or three?** EH, OHS and OT may sit different licensure
-  examinations under different councils. If so the outcome is three variables,
-  not one, with 27, 22 and 10 students behind them. This is a schema question,
-  not a wording question, and it must be answered before the column is filled.
-- **Row-order confirmation.** Identifiers are generated, so the college can
-  only align outcomes by source row order. Get the registrar to confirm in
-  writing that their result file preserves it. A silent off-by-one would
-  corrupt every downstream number without raising an error.
-- **An AHPC pass-rate source.** Blocks Chapter 2 §2.2 and the Chapter 1
-  baseline figure. The council publishes pass lists at `ahpc.gov.gh`.
+The nursing workbooks carry an Index No column and a Student Name column. They
+are the only source in the project that ever did.
+
+Names are dropped at parse time. Index numbers become HMAC-SHA256 digests keyed
+on a salt in `local/.nursing_salt`, gitignored and generated once. An unsalted
+hash would be worthless here: the identifier space is roughly six hundred values
+of the form `NUR-YY-NNN`, enumerable in under a second.
+
+`data/` is gitignored in full and no file under it has ever been tracked. An
+assertion in the consolidation script fails the build if an identifier-shaped
+column reaches an output.
 
 ---
 
@@ -70,20 +95,16 @@ stable and outcomes already collected do not shift.
 
 | Thesis section | Comes from |
 |---|---|
-| Ch. 3 Methodology, participant flow | `data_quality` sheet of the consolidated workbook |
-| Ch. 3 Methodology, reporting adherence | TRIPOD+AI statement (Collins et al., 2024) |
-| Ch. 4 Results, descriptives | `eda_descriptives.csv`, fail-rate-by-group tables |
-| Ch. 4 Results, model comparison | Stage 1 metrics table, `roc_pr_curves.png` |
-| Ch. 4 Results, Table 1 | `comparison_table.csv` (baseline vs E-XGBoost, Δ, p, d) |
-| Ch. 4 Results, selection bias | nested vs unnested arms, `unnested_metrics.json` |
-| Ch. 4 Results, ranking comparator | `gain_pruned_metrics.json` |
-| Ch. 4 Results, feature stability | `feature_stability.csv` |
-| Ch. 4 Results, explainability | `shap_beeswarm.png`, waterfall and dependence plots |
-| Ch. 4 Results, calibration (H4) | `calibration_curves.png` plus Brier skill scores |
-| Ch. 4 Results, fairness | FNR/FPR/EOD by programme from Stage 1 |
-| Ch. 5 Discussion, H1 | DeLong results |
-| Ch. 5 Discussion, H2 | see the note under Hypotheses below |
-| Ch. 5 Discussion, H3 | Trainee and tutor survey Likert results |
+| Ch. 3 Methodology, corpora | `data_quality` and `provenance` sheets, `strata.py` |
+| Ch. 3 Methodology, why not leave-one-out | the saturation argument in the findings |
+| Ch. 4 Results, baseline risk | `baseline_risk_profiles.csv` |
+| Ch. 4 Results, attribution | `solo_identifying_power.csv`, `saturation_curve.csv` |
+| Ch. 4 Results, group size | `group_size_effect.csv` |
+| Ch. 4 Results, generalisation floor | `precision_sweep.csv` |
+| Ch. 4 Results, Experiments A, B, C | `experiment_a/b/c_*.csv` |
+| Ch. 4 Results, linkage attack | `linkage_attack.csv` |
+| Ch. 4 Results, risk-utility frontier | `risk_utility_frontier.csv` |
+| Ch. 5 Discussion, recommended standard | the Pareto frontier |
 
 ---
 
@@ -91,110 +112,76 @@ stable and outcomes already collected do not shift.
 
 Do not re-open these without a reason.
 
-- **Imbalance.** A 35–65% failure rate is a natural distribution and gets no
-  resampling. Outside that band, `scale_pos_weight` applies.
+- **Corpora are never pooled.** Replication across three, not one merged sample.
+- **The public corpus is a replication, not a comparator.** Every table labels
+  its role.
+- **Band widths and recall tolerances are fractions of each corpus's grade
+  range**, not absolute values. A band of 0.5 covers an eighth of a four-point
+  GPA scale and a fortieth of a twenty-point scale, where it does not even merge
+  adjacent integers. Fixing the absolute width made generalisation look
+  ineffective on the public corpus when it had never been applied.
+- **The sensitive attribute is the bottom 40% of each corpus**, chosen as a
+  quantile rather than an absolute grade because the scales are not comparable
+  and both l-diversity and t-closeness are prevalence sensitive. Integer grades
+  tie, so the cut nearest 40% is used and the prevalence actually achieved is
+  reported.
+- **Sampling fraction is 1.** Every corpus is a complete population of its
+  cohorts, so sample uniqueness equals population uniqueness and prosecutor and
+  journalist risk coincide. Most published work must estimate this.
+- **Attribution is measured from below, not by leave-one-out.** Uniqueness
+  saturates at two attributes, so dropping any single member of a larger set
+  changes nothing and every marginal contribution returns zero.
 - **Fold design.** Five folds repeated across five seeds, giving 25 paired
-  observations. Five folds alone cannot support the claim: the smallest
-  two-sided p Wilcoxon can return at n=5 is 0.0625, so significance is
-  unreachable regardless of effect size. Repeating rather than raising the fold
-  count keeps test folds the same size, which matters at n=110. Rationale is at
-  the top of `baseline_xgboost.py`.
-- **Feature selection is nested inside every fold.** Ranking on the full
-  dataset and then cross-validating lets selection see held-out labels. On the
-  pilot corpus that inflated the AUC-PR gain from +0.0011 to +0.0057, so 81% of
-  the apparent improvement was bias (Vabalas et al., 2019). Both arms still
-  run; the gap between them is a reported result.
-- **E-XGBoost inherits the baseline's hyperparameters, and this was tested.** An
-  arm that re-tuned on the pruned feature set under the same protocol (same
-  grid, same scoring, tuned on the same training partition) selected a deeper,
-  faster model and performed *worse*: AUC-ROC 0.7055 against 0.7202, AUC-PR
-  0.5015 against 0.5253 on the simulated corpus. Freezing the hyperparameters
-  therefore does not handicap the engineered model, it helps it, and the
-  one-change rule costs nothing. The arm was removed from the pipeline to keep
-  the comparison simple; this record is the evidence if an examiner asks
-  whether the engineered model was disadvantaged by design.
-- **Engineering verdict.** Equivalence, not improvement. E-XGBoost matches the
-  baseline on 15 fewer predictors, with every effect size negligible. Claim
-  parsimony, not performance.
-- **Calibration.** Isotonic above 200 validation points, Platt below, fitted on
-  the validation fold only. It cannot change ranking by construction. Justified
-  by Van Calster et al. (2019): a well-discriminating but miscalibrated model
-  cannot support an "act if risk exceeds X%" rule, which is exactly what the
-  app does.
+  observations. Five folds alone cannot support a claim: the smallest two-sided
+  p Wilcoxon can return at n=5 is 0.0625.
 - **Metrics are reported against their no-skill floor.** 0.500 for AUC-ROC,
-  prevalence for AUC-PR, p(1−p) for Brier. Without this an AUC-PR of 0.74 at a
-  prevalence of 0.35 reads as far better than it is.
-- **Statistical tests.** DeLong for AUC, McNemar for label disagreement,
-  Wilcoxon with Cohen's d for the engineering comparison, α = 0.05. Report d
-  alongside every p regardless of the significance outcome.
-- **Synthetic data.** Pipeline testing and Option 2 replication only. Never
-  merged into a training set to inflate n. The route to 300 records is more
-  real cohorts.
+  prevalence for AUC-PR.
+- **Imbalance.** A 35-65% positive rate is a natural distribution and gets no
+  resampling.
+- **Statistical tests.** Wilcoxon with Cohen's d for difference claims, α = 0.05.
+  Equivalence claims need TOST against a stated margin, because a non-significant
+  difference test does not establish equivalence.
 - **Module layout.** Logic lives in flat modules at the repo root, not a `src/`
   package, so the numbered notebooks stay pasteable into Colab.
-
----
-
-## Hypotheses, as they now stand
-
-H2 as written compares academic indicators against demographic variables in
-SHAP importance. **The college releases no demographics**, so there is nothing
-to compare against and the hypothesis is not testable as stated.
-
-The supported reframe, which the ablation already evidences: test dominance
-*within* the academic indicators. Withholding the grade distribution costs
-0.187 AUC-PR and CGPA alone reaches only 0.3899 against 0.7222 for the full
-set. Put this to the supervisor rather than leaving H2 to fail silently.
+- **Synthetic data.** Pipeline testing only. Never merged into a corpus to
+  inflate n.
 
 ---
 
 ## Status
 
-- [x] Real records consolidated: 110 students, 5,095 grade records, 282 courses
-- [x] Deterministic identifiers generated, no PII anywhere in the pipeline
-- [x] Schema migrated to the semester-GPA feature set (36 features)
-- [x] Pipeline auto-detects real data and falls back to pilot until outcomes land
-- [x] Feature selection nested inside the CV loop
-- [x] Gain-ranked comparator arm on identical folds
-- [x] Probability calibration on the validation fold
-- [x] App updated for the new schema, verified end to end
-- [ ] HuSSREC approval reference
-- [ ] Licensure outcomes supplied by the college
-- [ ] One examination or three, confirmed by the registrar
-- [ ] Additional cohorts towards n = 300
-- [ ] Chapter 2 drafted in the allied-health framing
-- [ ] Manuscripts reframed from nursing to allied health
+- [x] Both Ghanaian corpora consolidated, no PII anywhere in the pipeline
+- [x] Public replication corpus wired in and labelled as such
+- [x] Phases 1 to 5 complete on all three corpora
+- [x] Findings documented
+- [ ] Significance testing: bootstrap Wilcoxon on risk, TOST on utility
+- [ ] Figures at 300 dpi
+- [ ] Runtimes measured for the efficiency subsection
+- [ ] Ethics approval reference number recorded
+- [ ] Phase 6: the written de-identification standard
+- [ ] Differential privacy comparison arm
+- [ ] Methods and Results drafted to the Q1 templates
+
+Full plan: [NewDirection/writing-plan.md](NewDirection/writing-plan.md).
 
 ---
 
 ## Contribution defence
 
-Three claims, stated and then left alone:
+The engineered artefact is **derivation-consistent generalisation**: one
+modification to a standard de-identification pipeline, in which features derived
+from a protected variable are recomputed from the protected values rather than
+from the originals.
 
-1. Original field data, the first Ghanaian health-professions licensure dataset
-   assembled for machine learning.
-2. A modern explainable model, XGBoost with SHAP.
-3. An engineered model, E-XGBoost, compared against a locked baseline on
-   identical folds with selection nested inside every fold.
+- **Baseline.** Standard generalisation. Bands the source variables, publishes
+  derived features at original precision. This is what pipelines do today.
+- **Proposed.** Recomputes the derived features from the bands.
+- **Ablation.** Revert the derivation step. Protection collapses by 98.7% to
+  100% across the study population, and by 67% to 89% on the replication corpus.
 
-On "did you engineer the model or just apply it?": E-XGBoost removes the
-features below the 95% cumulative SHAP threshold, retrains on identical splits
-with identical hyperparameters and seeds, and is Wilcoxon-tested against the
-baseline. One change only, so any difference is attributable to the pruning.
-
-Three follow-ups worth rehearsing, because they are the ones an examiner who
-knows the field will actually ask:
-
-- **"Isn't SHAP-based feature selection already established?"** Yes. Powershap
-  (Verhaeghe et al., 2023) and LLpowershap (Madakkatel & Hyppönen, 2024)
-  formalise it, and Wang et al. (2024) report importance-based selection
-  beating it. The claim is not invention. It is the first evaluation of it in
-  health-professions licensure prediction, on a Sub-Saharan African cohort,
-  under a severe sample-size constraint. The gain-ranked arm answers Wang
-  directly: it needs 29.4 features to SHAP's 21.0 for the same discrimination.
-- **"Why prune at all if it doesn't improve accuracy?"** Events per predictor
-  parameter is roughly 1.0 at n=110 against 36 parameters. Riley et al. (2019)
-  make reducing parameters the textbook response. Pruning is a methodological
-  necessity here, not an interpretability preference.
-- **"Did feature selection see your test data?"** No, and the repository shows
-  the unnested arm alongside the nested one to quantify what it would have cost.
+The claim is not that generalisation is novel. It is that the interaction
+between generalisation and derived features has never been measured, that the
+interaction destroys the protection, and that the fix costs nothing in model
+utility. Utility is identical to three decimal places between the leaky and safe
+releases in every configuration tested, which makes the leaky release a
+dominated choice rather than a trade-off.

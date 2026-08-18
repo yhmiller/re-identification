@@ -33,34 +33,26 @@ sys.path.insert(0, str(ROOT))
 import attack_models as am  # noqa: E402
 import deidentify as di  # noqa: E402
 import disclosure_risk as dr  # noqa: E402
+import strata as st  # noqa: E402
 
 RESULTS = ROOT / "results" / "disclosure"
 RESULTS.mkdir(parents=True, exist_ok=True)
 
-SEMESTERS = [f"gpa_sem{i}" for i in range(1, 7)]
-BAND_WIDTH = 0.5
 
-# What an attacker plausibly recalls. A grade remembered "to within half a
-# point" is generous to the target; "to within a quarter" is the sharper
-# recollection of someone who saw a transcript rather than heard a number.
-LOOSE, SHARP = 0.5, 0.25
+# What an attacker plausibly recalls, as a fraction of the grade range rather
+# than an absolute margin. Recalling a GPA "to within half a point" on a
+# four-point scale is the same feat as recalling a mark to within 2.5 on a
+# twenty-point scale, and only the fractional form compares across corpora.
+LOOSE_FRACTION, SHARP_FRACTION = 0.125, 0.0625
 
-
-def load_strata():
-    allied = pd.read_excel(ROOT / "data" / "model_dataset_2021_2022.xlsx")
-    allied["group"] = (
-        allied["programme"].astype(str) + "-" + allied["cohort_year"].astype(str)
-    )
-
-    nursing = pd.read_excel(
-        ROOT / "data" / "consolidated_nursing.xlsx", sheet_name="students"
-    )
-    nursing["group"] = "NUR-" + nursing["intake_year"].astype(str)
-
-    return {"allied_health": allied, "nursing": nursing}
+ROLES = {"allied_health": "study population",
+         "nursing": "study population",
+         "public": "replication corpus"}
 
 
-def releases(frame):
+
+
+def releases(frame, SEMESTERS, BAND_WIDTH):
     """The three configurations a custodian might hand out.
 
     Each carries the band width it was generalised at, because the attacker
@@ -83,32 +75,45 @@ def releases(frame):
     }
 
 
-SCENARIOS = [
-    ("group only", [("group", None)]),
-    ("group + 1 grade, loose recall", [("group", None), ("gpa_sem1", LOOSE)]),
-    ("group + 1 grade, sharp recall", [("group", None), ("gpa_sem1", SHARP)]),
-    ("group + 2 grades, loose recall",
-     [("group", None), ("gpa_sem1", LOOSE), ("gpa_sem2", LOOSE)]),
-    ("group + 2 grades, sharp recall",
-     [("group", None), ("gpa_sem1", SHARP), ("gpa_sem2", SHARP)]),
-    ("group + cgpa to 1dp", [("group", None), ("cgpa", 0.05)]),
-    ("2 grades, no group", [("gpa_sem1", SHARP), ("gpa_sem2", SHARP)]),
-]
+def scenarios_for(stratum):
+    seq, loose, sharp = stratum.sequence, *(
+        f * stratum.scale_max for f in (LOOSE_FRACTION, SHARP_FRACTION))
+    scenarios = [
+        ("group only", [("group", None)]),
+        ("group + 1 grade, loose recall", [("group", None), (seq[0], loose)]),
+        ("group + 1 grade, sharp recall", [("group", None), (seq[0], sharp)]),
+        ("group + 2 grades, loose recall",
+         [("group", None), (seq[0], loose), (seq[1], loose)]),
+        ("group + 2 grades, sharp recall",
+         [("group", None), (seq[0], sharp), (seq[1], sharp)]),
+        ("2 grades, no group", [(seq[0], sharp), (seq[1], sharp)]),
+    ]
+    if "cgpa" in stratum.frame.columns:
+        scenarios.append(("group + cgpa to 1dp",
+                          [("group", None), ("cgpa", 0.05)]))
+    if stratum.demographics:
+        scenarios.append(("group + demographics",
+                          [("group", None)] + [(d, None) for d in stratum.demographics]))
+    return scenarios
 
 
-def derived_scenarios(release_name):
+def derived_scenarios(release_name, stratum):
     """Only meaningful where the derived features were actually published."""
     if release_name != "banded + derived":
         return []
+    sharp = SHARP_FRACTION * stratum.scale_max
     return [
-        ("group + gpa_trend recalled", [("group", None), ("gpa_trend", SHARP)]),
-        ("gpa_min + gpa_max recalled",
-         [("gpa_min", SHARP), ("gpa_max", SHARP)]),
+        ("group + gpa_trend recalled", [("group", None), ("gpa_trend", sharp)]),
+        ("gpa_min + gpa_max recalled", [("gpa_min", sharp), ("gpa_max", sharp)]),
     ]
 
 
-def run_stratum(name, frame):
-    print(f"\n{'=' * 78}\n{name}: {len(frame)} students\n{'=' * 78}")
+def run_stratum(stratum):
+    name, frame = stratum.name, stratum.frame
+    SEMESTERS = stratum.sequence
+    BAND_WIDTH = stratum.band_widths[1]
+    print(f"\n{'=' * 78}\n{name} ({ROLES[name]}): {len(frame)} students, "
+          f"band width {BAND_WIDTH}\n{'=' * 78}")
     rows = []
 
     # The attacker recalls true values, including true derived features, so the
@@ -118,12 +123,12 @@ def run_stratum(name, frame):
         di.derive_features(frame, SEMESTERS)
     )
 
-    for release_name, (released, width) in releases(frame).items():
+    for release_name, (released, width) in releases(frame, SEMESTERS, BAND_WIDTH).items():
         print(f"\n  release: {release_name}")
         print(f"    {'scenario':<32}{'mean set':>10}{'isolated':>10}"
               f"{'correct':>9}{'kept':>7}")
 
-        for label, spec in SCENARIOS + derived_scenarios(release_name):
+        for label, spec in scenarios_for(stratum) + derived_scenarios(release_name, stratum):
             if any(c not in released.columns or c not in truth.columns
                    for c, _ in spec):
                 continue
@@ -163,7 +168,7 @@ def run_stratum(name, frame):
 
 
 def main():
-    frames = [run_stratum(name, frame) for name, frame in load_strata().items()]
+    frames = [run_stratum(s) for s in st.load_all().values()]
     out = pd.concat(frames, ignore_index=True)
 
     lead = ["stratum", "release", "attack"]
