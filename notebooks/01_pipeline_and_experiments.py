@@ -22,6 +22,7 @@
 Run this cell ONCE at the start of each Colab session.
 It installs the exact versions pinned in requirements.txt.
 """
+
 # !pip install xgboost==2.0.3 lightgbm==4.1.0 scikit-learn==1.4.2 \
 #              imbalanced-learn==0.12.3 shap==0.44.1 sdv==1.11.0 \
 #              statsmodels==0.14.2 seaborn==0.13.2 --quiet
@@ -40,6 +41,7 @@ import pandas as pd
 # closed — that would hang a headless run forever. Figures are saved to results/
 # either way; inline display still works under IPython where get_ipython exists.
 import matplotlib
+
 try:
     get_ipython()  # noqa: F821 — only defined inside IPython/Jupyter/Colab
 except NameError:
@@ -53,20 +55,20 @@ import seaborn as sns
 # the first .fit(). Forcing that fit here, before torch loads, lets the two
 # runtimes coexist instead of segfaulting at training time. No-op on Linux/Colab.
 import lightgbm as lgb
+
 lgb.LGBMClassifier(n_estimators=1).fit(np.zeros((4, 1)), [0, 1, 0, 1])
 
 import shap
 import xgboost as xgb
-from sklearn.metrics import (RocCurveDisplay, PrecisionRecallDisplay,
-                             brier_score_loss)
+from sklearn.metrics import RocCurveDisplay, PrecisionRecallDisplay, brier_score_loss
 from sklearn.calibration import CalibrationDisplay
 from sklearn.model_selection import train_test_split
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 # ── Global reproducibility ──────────────────────────────────
 SEED = 42
-os.environ['PYTHONHASHSEED'] = str(SEED)
+os.environ["PYTHONHASHSEED"] = str(SEED)
 np.random.seed(SEED)
 
 # Results are split by dataset source: results/synthetic/ or results/real/
@@ -75,9 +77,14 @@ np.random.seed(SEED)
 RESULTS_ROOT = "results"
 
 print("✅ Imports and seeds set. numpy seed:", SEED)
-print("   XGBoost:", xgb.__version__,
-      "| LightGBM:", lgb.__version__,
-      "| SHAP:", shap.__version__)
+print(
+    "   XGBoost:",
+    xgb.__version__,
+    "| LightGBM:",
+    lgb.__version__,
+    "| SHAP:",
+    shap.__version__,
+)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -100,9 +107,16 @@ except NameError:
     pass  # __file__ is undefined in a pasted Colab cell — rely on the cwd
 
 from schema import (
-    GPA_COLS, GRADE_COUNT_COLS,
-    NUMERIC_COLS, CATEGORICAL_COLS, ALL_FEATURES, TARGET,
-    engineer_features, ENGINEERED_NUMERIC, ALL_NUMERIC, ALL_FEATURES_V2,
+    GPA_COLS,
+    GRADE_COUNT_COLS,
+    NUMERIC_COLS,
+    CATEGORICAL_COLS,
+    ALL_FEATURES,
+    TARGET,
+    engineer_features,
+    ENGINEERED_NUMERIC,
+    ALL_NUMERIC,
+    ALL_FEATURES_V2,
 )
 
 # Reusable core-logic modules (repo root) — see docs/TODO.md for the map of
@@ -129,8 +143,12 @@ print(f"   Target : '{TARGET}' (1 = fail, 0 = pass)")
 # ─────────────────────────────────────────────────────────────
 
 syn_df = synthetic_data.generate_pilot_data(
-    GPA_COLS, GRADE_COUNT_COLS, TARGET, SEED,
-    n_reference=30, n_rows=1000,
+    GPA_COLS,
+    GRADE_COUNT_COLS,
+    TARGET,
+    SEED,
+    n_reference=30,
+    n_rows=1000,
 )
 
 print("✅ Synthetic data generated.")
@@ -141,8 +159,11 @@ print(syn_df[TARGET].value_counts(normalize=True).rename({0: "Pass", 1: "Fail"})
 print("\n   ⚠️  SYNTHETIC DATA — used for pipeline testing only.")
 print("   Real data is loaded in CELL 6 when outcomes are available.")
 print("\n   Preview:")
-print(syn_df[["cgpa", "gpa_sem1", "gpa_sem6", "n_courses",
-              "programme", TARGET]].head(5).to_string(index=False))
+print(
+    syn_df[["cgpa", "gpa_sem1", "gpa_sem6", "n_courses", "programme", TARGET]]
+    .head(5)
+    .to_string(index=False)
+)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -184,9 +205,11 @@ ALPHA_CORPUS = os.environ.get("ALPHA_CORPUS")
 SYNTHETIC_OUTCOMES = os.environ.get("SYNTHETIC_OUTCOMES")
 
 flow = real_data.summarise()
-print(f"ℹ️  College dataset: {flow['records_total']} records | "
-      f"outcomes supplied {flow['outcomes_supplied']} | "
-      f"cohorts {flow['cohorts']} | programmes {flow['programmes']}")
+print(
+    f"ℹ️  College dataset: {flow['records_total']} records | "
+    f"outcomes supplied {flow['outcomes_supplied']} | "
+    f"cohorts {flow['cohorts']} | programmes {flow['programmes']}"
+)
 
 if ALPHA_CORPUS:
     raw_df = engineer_features(pd.read_excel(ALPHA_CORPUS, sheet_name="SYNTHETIC_data"))
@@ -202,9 +225,13 @@ elif SYNTHETIC_OUTCOMES:
         # not land in a real_synthetic_outcome_pNNN/ directory: that NNN is an
         # assumed prevalence, and these outcomes are measured, not assumed.
         DATA_SOURCE = "real"
-        print(f"✅ REGISTRAR RETURN: {len(raw_df)} students with OBSERVED outcomes "
-              f"from {SYNTHETIC_OUTCOMES}")
-        print(f"   Observed failure rate: {raw_df[TARGET].mean():.3f} (measured, not assumed).")
+        print(
+            f"✅ REGISTRAR RETURN: {len(raw_df)} students with OBSERVED outcomes "
+            f"from {SYNTHETIC_OUTCOMES}"
+        )
+        print(
+            f"   Observed failure rate: {raw_df[TARGET].mean():.3f} (measured, not assumed)."
+        )
     elif pd.isna(prevalence):
         # Failing here rather than defaulting: a guessed prevalence would name
         # the results directory after a number nothing in the run supports.
@@ -216,11 +243,16 @@ elif SYNTHETIC_OUTCOMES:
             "field, so it cannot be defaulted without mislabelling the "
             "directory. Either add the prevalence to the workbook, or supply "
             "the registrar's genuine return, which needs no provenance sheet "
-            "and runs as observed data.")
+            "and runs as observed data."
+        )
     else:
         DATA_SOURCE = f"real_synthetic_outcome_p{int(round(prevalence * 1000)):03d}"
-        print(f"⚠️  REAL academic records with SIMULATED outcomes: {len(raw_df)} students")
-        print(f"⚠️  Prevalence {prevalence} is an ASSUMPTION — no AHPC pass rate is published.")
+        print(
+            f"⚠️  REAL academic records with SIMULATED outcomes: {len(raw_df)} students"
+        )
+        print(
+            f"⚠️  Prevalence {prevalence} is an ASSUMPTION — no AHPC pass rate is published."
+        )
         print("⚠️  Outcomes here are GENERATED. Nothing from this run is reportable.")
 elif FORCE_PILOT:
     raw_df, DATA_SOURCE = syn_df.copy(), "synthetic"
@@ -239,11 +271,13 @@ else:
 # hardcoding it, so a real-data run cannot silently ship plots captioned
 # "SYNTHETIC DATA".
 if DATA_SOURCE.startswith("real_synthetic_outcome"):
-    SOURCE_NOTE = (f"Real academic records, SIMULATED outcomes "
-                   f"(prevalence {raw_df.attrs.get('outcome_prevalence')}) — not reportable")
+    SOURCE_NOTE = (
+        f"Real academic records, SIMULATED outcomes "
+        f"(prevalence {raw_df.attrs.get('outcome_prevalence')}) — not reportable"
+    )
 else:
     SOURCE_NOTE = {
-        "synthetic":       "SYNTHETIC DATA — pipeline testing only",
+        "synthetic": "SYNTHETIC DATA — pipeline testing only",
         "synthetic_alpha": "SIMULATED ALPHA CORPUS — generated outcomes, not reportable",
     }.get(DATA_SOURCE, "Institutional cohort")
 
@@ -293,25 +327,34 @@ ZERO_VARIANCE = [c for c in ALL_FEATURES_V2 if _candidate[c].nunique(dropna=True
 MODEL_FEATURES = [c for c in ALL_FEATURES_V2 if c not in ZERO_VARIANCE]
 
 if ZERO_VARIANCE:
-    print(f"ℹ️  Dropped {len(ZERO_VARIANCE)} zero-variance predictor(s): {ZERO_VARIANCE}")
+    print(
+        f"ℹ️  Dropped {len(ZERO_VARIANCE)} zero-variance predictor(s): {ZERO_VARIANCE}"
+    )
 else:
-    print("✅ No zero-variance predictors; all "
-          f"{len(MODEL_FEATURES)} features retained.")
+    print(
+        "✅ No zero-variance predictors; all "
+        f"{len(MODEL_FEATURES)} features retained."
+    )
 
-_missing_pct = (_candidate[MODEL_FEATURES].isna().mean() * 100)
-print(f"   Maximum missingness across predictors: {_missing_pct.max():.2f}% "
-      f"({int((_missing_pct > 0).sum())} of {len(MODEL_FEATURES)} affected)")
+_missing_pct = _candidate[MODEL_FEATURES].isna().mean() * 100
+print(
+    f"   Maximum missingness across predictors: {_missing_pct.max():.2f}% "
+    f"({int((_missing_pct > 0).sum())} of {len(MODEL_FEATURES)} affected)"
+)
 
 X = raw_df[MODEL_FEATURES]
 y = raw_df[TARGET]
 
 # ── Stratified random split ──────────────────────────────────
-X_trainval, X_test,   y_trainval, y_test   = train_test_split(
+X_trainval, X_test, y_trainval, y_test = train_test_split(
     X, y, test_size=0.15, stratify=y, random_state=SEED
 )
-X_train,    X_val,    y_train,    y_val     = train_test_split(
-    X_trainval, y_trainval, test_size=0.15/0.85,
-    stratify=y_trainval, random_state=SEED
+X_train, X_val, y_train, y_val = train_test_split(
+    X_trainval,
+    y_trainval,
+    test_size=0.15 / 0.85,
+    stratify=y_trainval,
+    random_state=SEED,
 )
 
 print("✅ Stratified split (70 / 15 / 15):")
@@ -341,11 +384,12 @@ preprocessor = baseline_xgboost.build_preprocessor(MODEL_NUMERIC, MODEL_CATEGORI
 
 # Quick smoke test
 X_train_proc = preprocessor.fit_transform(X_train)
-X_val_proc   = preprocessor.transform(X_val)
-X_test_proc  = preprocessor.transform(X_test)
+X_val_proc = preprocessor.transform(X_val)
+X_test_proc = preprocessor.transform(X_test)
 
 FEATURE_NAMES = baseline_xgboost.encoded_feature_names(
-    preprocessor, MODEL_NUMERIC, MODEL_CATEGORICAL)
+    preprocessor, MODEL_NUMERIC, MODEL_CATEGORICAL
+)
 
 print("✅ Preprocessing pipeline built and fitted.")
 print(f"   Input features  : {X_train.shape[1]}")
@@ -358,18 +402,28 @@ print(f"   Train rows      : {X_train_proc.shape[0]}")
 # All use the SAME preprocessor from CELL 8. (baseline_xgboost.train_comparator_baselines)
 # ─────────────────────────────────────────────────────────────
 
-baseline_results, baseline_models, baseline_probas = baseline_xgboost.train_comparator_baselines(
-    X_train_proc, y_train, X_val_proc, y_val, X_test_proc, y_test, SEED)
-lr_proba, rf_proba, lgbm_proba = (baseline_probas["Logistic Regression"],
-                                   baseline_probas["Random Forest"],
-                                   baseline_probas["LightGBM"])
+baseline_results, baseline_models, baseline_probas = (
+    baseline_xgboost.train_comparator_baselines(
+        X_train_proc, y_train, X_val_proc, y_val, X_test_proc, y_test, SEED
+    )
+)
+lr_proba, rf_proba, lgbm_proba = (
+    baseline_probas["Logistic Regression"],
+    baseline_probas["Random Forest"],
+    baseline_probas["LightGBM"],
+)
 
 print("✅ Baseline models trained and evaluated on test set.")
 stats_validation.print_metrics(baseline_results)
 
 import joblib
-joblib.dump(baseline_models["Logistic Regression"], os.path.join(RESULTS_DIR, "lr_baseline.pkl"))
-joblib.dump(baseline_models["Random Forest"], os.path.join(RESULTS_DIR, "rf_baseline.pkl"))
+
+joblib.dump(
+    baseline_models["Logistic Regression"], os.path.join(RESULTS_DIR, "lr_baseline.pkl")
+)
+joblib.dump(
+    baseline_models["Random Forest"], os.path.join(RESULTS_DIR, "rf_baseline.pkl")
+)
 joblib.dump(baseline_models["LightGBM"], os.path.join(RESULTS_DIR, "lgbm_baseline.pkl"))
 print("\n   Models saved.")
 
@@ -395,8 +449,16 @@ print(f"   Best CV AUC-PR: {grid.best_score_:.4f}")
 # ─────────────────────────────────────────────────────────────
 
 xgb_clf, xgb_res, xgb_proba, xgb_labels = baseline_xgboost.train_xgboost(
-    X_train_proc, y_train, X_val_proc, y_val, X_test_proc, y_test,
-    best_xgb_params, spw, SEED)
+    X_train_proc,
+    y_train,
+    X_val_proc,
+    y_val,
+    X_test_proc,
+    y_test,
+    best_xgb_params,
+    spw,
+    SEED,
+)
 
 print("✅ XGBoost trained.")
 print(f"   Best iteration: {xgb_clf.best_iteration}")
@@ -409,16 +471,25 @@ stats_validation.print_metrics(all_results)
 # below that Platt scaling is the safer choice, so pick on validation size.
 CALIBRATION_METHOD = "isotonic" if len(y_val) >= 200 else "sigmoid"
 xgb_calibrated, calib_res, xgb_proba_calibrated = baseline_xgboost.calibrate(
-    xgb_clf, X_val_proc, y_val, X_test_proc, y_test, method=CALIBRATION_METHOD)
+    xgb_clf, X_val_proc, y_val, X_test_proc, y_test, method=CALIBRATION_METHOD
+)
 
-print(f"\n✅ Probability calibration ({calib_res['method']}, fitted on validation fold):")
+print(
+    f"\n✅ Probability calibration ({calib_res['method']}, fitted on validation fold):"
+)
 print(f"   No-skill Brier            : {calib_res['brier_no_skill']:.4f}")
-print(f"   Brier before calibration  : {xgb_res['brier']:.4f} "
-      f"(skill {1 - xgb_res['brier'] / calib_res['brier_no_skill']:+.3f})")
-print(f"   Brier after  calibration  : {calib_res['brier']:.4f} "
-      f"(skill {calib_res['brier_skill_score']:+.3f})")
-print(f"   Ranking unchanged by design: AUC-ROC {calib_res['auc_roc']:.4f} | "
-      f"AUC-PR {calib_res['auc_pr']:.4f}")
+print(
+    f"   Brier before calibration  : {xgb_res['brier']:.4f} "
+    f"(skill {1 - xgb_res['brier'] / calib_res['brier_no_skill']:+.3f})"
+)
+print(
+    f"   Brier after  calibration  : {calib_res['brier']:.4f} "
+    f"(skill {calib_res['brier_skill_score']:+.3f})"
+)
+print(
+    f"   Ranking unchanged by design: AUC-ROC {calib_res['auc_roc']:.4f} | "
+    f"AUC-PR {calib_res['auc_pr']:.4f}"
+)
 
 joblib.dump(xgb_clf, os.path.join(RESULTS_DIR, "xgboost_model.pkl"))
 print("\n   Model saved → " + RESULTS_DIR + "/xgboost_model.pkl")
@@ -431,14 +502,16 @@ INFERENCE_BUNDLE = {
     "model": xgb_clf,
     "preprocessor": preprocessor,
     "engineer_features": engineer_features,
-    "feature_columns": MODEL_FEATURES,   # order the preprocessor expects
+    "feature_columns": MODEL_FEATURES,  # order the preprocessor expects
     "encoded_feature_names": FEATURE_NAMES,
     "raw_numeric_columns": NUMERIC_COLS,
     "categorical_columns": CATEGORICAL_COLS,
     "target": TARGET,
-    "data_source": DATA_SOURCE,   # "synthetic" or "real" — drives the app banner
+    "data_source": DATA_SOURCE,  # "synthetic" or "real" — drives the app banner
 }
-prediction.save_bundle(INFERENCE_BUNDLE, os.path.join(RESULTS_DIR, "inference_bundle.pkl"))
+prediction.save_bundle(
+    INFERENCE_BUNDLE, os.path.join(RESULTS_DIR, "inference_bundle.pkl")
+)
 print("   Inference bundle saved → " + RESULTS_DIR + "/inference_bundle.pkl")
 
 
@@ -462,11 +535,16 @@ stats_validation.print_class_metrics(xgb_class_metrics, model_name="XGBoost (bas
 # ─────────────────────────────────────────────────────────────
 SEED_RUNS = 10
 seed_var_df = baseline_xgboost.repeated_seed_variance(
-    X_train_proc, y_train, X_test_proc, y_test, best_xgb_params, spw, n_runs=SEED_RUNS)
+    X_train_proc, y_train, X_test_proc, y_test, best_xgb_params, spw, n_runs=SEED_RUNS
+)
 seed_var_df.to_csv(os.path.join(RESULTS_DIR, "seed_variance.csv"), index=False)
 print(f"✅ Repeated-seed variance ({SEED_RUNS} runs):")
-print(f"   AUC-ROC: {seed_var_df['auc_roc'].mean():.4f} ± {seed_var_df['auc_roc'].std():.4f}")
-print(f"   AUC-PR : {seed_var_df['auc_pr'].mean():.4f} ± {seed_var_df['auc_pr'].std():.4f}")
+print(
+    f"   AUC-ROC: {seed_var_df['auc_roc'].mean():.4f} ± {seed_var_df['auc_roc'].std():.4f}"
+)
+print(
+    f"   AUC-PR : {seed_var_df['auc_pr'].mean():.4f} ± {seed_var_df['auc_pr'].std():.4f}"
+)
 print("   Saved → " + RESULTS_DIR + "/seed_variance.csv")
 
 
@@ -476,14 +554,19 @@ print("   Saved → " + RESULTS_DIR + "/seed_variance.csv")
 # Runs only when cohort_year is present. (baseline_xgboost.temporal_validation)
 # ─────────────────────────────────────────────────────────────
 temporal_df = baseline_xgboost.temporal_validation(
-    raw_df, X, y, preprocessor, best_xgb_params, spw, SEED)
+    raw_df, X, y, preprocessor, best_xgb_params, spw, SEED
+)
 if temporal_df is not None:
-    temporal_df.to_csv(os.path.join(RESULTS_DIR, "temporal_validation.csv"), index=False)
+    temporal_df.to_csv(
+        os.path.join(RESULTS_DIR, "temporal_validation.csv"), index=False
+    )
     print("✅ Temporal validation (train past cohorts → test latest):")
     print(temporal_df.to_string(index=False))
     print("   Saved → " + RESULTS_DIR + "/temporal_validation.csv")
 else:
-    print("ℹ️  Temporal validation skipped (no cohort_year, or test cohort single-class).")
+    print(
+        "ℹ️  Temporal validation skipped (no cohort_year, or test cohort single-class)."
+    )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -491,14 +574,11 @@ else:
 # Uses TreeExplainer — exact Shapley values for XGBoost.
 # ─────────────────────────────────────────────────────────────
 
-explainer   = shap.TreeExplainer(xgb_clf)
+explainer = shap.TreeExplainer(xgb_clf)
 shap_values = explainer.shap_values(X_test_proc)
 
 # Convert to DataFrame for analysis
-shap_df = pd.DataFrame(
-    np.abs(shap_values),
-    columns=FEATURE_NAMES
-)
+shap_df = pd.DataFrame(np.abs(shap_values), columns=FEATURE_NAMES)
 global_importance = shap_df.mean().sort_values(ascending=False)
 
 print("✅ SHAP computed.")
@@ -507,15 +587,22 @@ print(global_importance.head(10).to_string())
 
 # Beeswarm plot
 plt.figure(figsize=(10, 7))
-shap.summary_plot(shap_values, X_test_proc,
-                  feature_names=FEATURE_NAMES,
-                  plot_type="violin",
-                  show=False)
-plt.title("Global SHAP Feature Importance — AHPC-LE Failure Prediction\n"
-          f"({SOURCE_NOTE})",
-          fontsize=11, style="italic")
+shap.summary_plot(
+    shap_values,
+    X_test_proc,
+    feature_names=FEATURE_NAMES,
+    plot_type="violin",
+    show=False,
+)
+plt.title(
+    "Global SHAP Feature Importance — AHPC-LE Failure Prediction\n" f"({SOURCE_NOTE})",
+    fontsize=11,
+    style="italic",
+)
 plt.tight_layout()
-plt.savefig(os.path.join(RESULTS_DIR, "shap_beeswarm.png"), dpi=150, bbox_inches="tight")
+plt.savefig(
+    os.path.join(RESULTS_DIR, "shap_beeswarm.png"), dpi=150, bbox_inches="tight"
+)
 plt.show()
 print("   Plot saved → shap_beeswarm.png")
 
@@ -525,6 +612,7 @@ print("   Plot saved → shap_beeswarm.png")
 # How each top predictor's value relates to its SHAP impact on risk.
 # ─────────────────────────────────────────────────────────────
 import re, glob
+
 # Dependence-plot filenames depend on which features rank top-3, which can shift
 # between runs — clear stale ones so results/ only holds the current top-3.
 for stale in glob.glob(os.path.join(RESULTS_DIR, "shap_dependence_*.png")):
@@ -532,14 +620,17 @@ for stale in glob.glob(os.path.join(RESULTS_DIR, "shap_dependence_*.png")):
 top3_features = global_importance.head(3).index.tolist()
 for feat in top3_features:
     plt.figure()
-    shap.dependence_plot(feat, shap_values, X_test_proc,
-                         feature_names=FEATURE_NAMES, show=False)
-    plt.title(f"SHAP dependence — {feat}\n({SOURCE_NOTE})",
-              fontsize=10, style="italic")
+    shap.dependence_plot(
+        feat, shap_values, X_test_proc, feature_names=FEATURE_NAMES, show=False
+    )
+    plt.title(f"SHAP dependence — {feat}\n({SOURCE_NOTE})", fontsize=10, style="italic")
     plt.tight_layout()
     safe = re.sub(r"[^0-9a-zA-Z]+", "_", feat).strip("_")
-    plt.savefig(os.path.join(RESULTS_DIR, f"shap_dependence_{safe}.png"),
-                dpi=150, bbox_inches="tight")
+    plt.savefig(
+        os.path.join(RESULTS_DIR, f"shap_dependence_{safe}.png"),
+        dpi=150,
+        bbox_inches="tight",
+    )
     plt.close()
 print(f"✅ SHAP dependence plots (top-3): {top3_features}")
 
@@ -557,11 +648,18 @@ if len(fail_idx) > 0:
     for rank, idx in enumerate(top5, 1):
         fig, ax = plt.subplots(figsize=(10, 4))
         shap.plots.waterfall(shap_explanation[idx], show=False, max_display=12)
-        plt.title(f"Student {rank} — Predicted Fail (p={xgb_proba[idx]:.3f})\n"
-                  f"({SOURCE_NOTE})", fontsize=10, style="italic")
+        plt.title(
+            f"Student {rank} — Predicted Fail (p={xgb_proba[idx]:.3f})\n"
+            f"({SOURCE_NOTE})",
+            fontsize=10,
+            style="italic",
+        )
         plt.tight_layout()
-        plt.savefig(os.path.join(RESULTS_DIR, f"shap_waterfall_student{rank}.png"),
-                    dpi=150, bbox_inches="tight")
+        plt.savefig(
+            os.path.join(RESULTS_DIR, f"shap_waterfall_student{rank}.png"),
+            dpi=150,
+            bbox_inches="tight",
+        )
         plt.show()
     print(f"✅ Waterfall plots saved for {len(top5)} at-risk students.")
 else:
@@ -574,27 +672,27 @@ else:
 # ─────────────────────────────────────────────────────────────
 
 fig, ax = plt.subplots(figsize=(7, 6))
-ax.plot([0,1],[0,1],"k--", label="Perfectly calibrated", linewidth=1)
+ax.plot([0, 1], [0, 1], "k--", label="Perfectly calibrated", linewidth=1)
 
 models_eval = [
     ("Logistic Regression", lr_proba),
-    ("Random Forest",       rf_proba),
-    ("LightGBM",            lgbm_proba),
-    ("XGBoost",             xgb_proba),
+    ("Random Forest", rf_proba),
+    ("LightGBM", lgbm_proba),
+    ("XGBoost", xgb_proba),
 ]
 
 for mname, proba in models_eval:
     bs = brier_score_loss(y_test, proba)
     disp = CalibrationDisplay.from_predictions(
-        y_test, proba, n_bins=8,
-        name=f"{mname} (Brier={bs:.4f})",
-        ax=ax
+        y_test, proba, n_bins=8, name=f"{mname} (Brier={bs:.4f})", ax=ax
     )
 
 ax.set_title(f"Calibration Curves — All Models\n({SOURCE_NOTE})", style="italic")
 ax.legend(loc="upper left", fontsize=8)
 plt.tight_layout()
-plt.savefig(os.path.join(RESULTS_DIR, "calibration_curves.png"), dpi=150, bbox_inches="tight")
+plt.savefig(
+    os.path.join(RESULTS_DIR, "calibration_curves.png"), dpi=150, bbox_inches="tight"
+)
 plt.show()
 print("✅ Calibration curves saved → calibration_curves.png")
 
@@ -618,30 +716,38 @@ fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
 for mname, proba in models_eval:
     RocCurveDisplay.from_predictions(
-        y_test, proba, name=mname, ax=axes[0], plot_chance_level=(mname=="XGBoost")
+        y_test, proba, name=mname, ax=axes[0], plot_chance_level=(mname == "XGBoost")
     )
-    PrecisionRecallDisplay.from_predictions(
-        y_test, proba, name=mname, ax=axes[1]
-    )
+    PrecisionRecallDisplay.from_predictions(y_test, proba, name=mname, ax=axes[1])
 
 # A precision-recall curve has no fixed chance line: a no-skill classifier sits
 # at y = prevalence, not at 0.5. Without this reference an AUC-PR of 0.64 reads
 # as mediocre when it is in fact roughly twice the no-skill floor.
 no_skill = float(y_test.mean())
-axes[1].axhline(no_skill, linestyle=":", color="0.35", linewidth=1.6,
-                 label=f"No-skill classifier (prevalence = {no_skill:.3f})")
+axes[1].axhline(
+    no_skill,
+    linestyle=":",
+    color="0.35",
+    linewidth=1.6,
+    label=f"No-skill classifier (prevalence = {no_skill:.3f})",
+)
 axes[1].legend(loc="upper right", fontsize=8)
 axes[1].set_ylim(0, 1)
 
 axes[0].set_title(f"ROC Curves\n({SOURCE_NOTE})", style="italic")
-axes[1].set_title(f"Precision-Recall Curves — PRIMARY METRIC\n({SOURCE_NOTE})",
-                   style="italic")
+axes[1].set_title(
+    f"Precision-Recall Curves — PRIMARY METRIC\n({SOURCE_NOTE})", style="italic"
+)
 plt.tight_layout()
-plt.savefig(os.path.join(RESULTS_DIR, "roc_pr_curves.png"), dpi=150, bbox_inches="tight")
+plt.savefig(
+    os.path.join(RESULTS_DIR, "roc_pr_curves.png"), dpi=150, bbox_inches="tight"
+)
 plt.show()
 print("✅ ROC + PR curves saved → roc_pr_curves.png")
-print(f"   No-skill reference lines — AUC-ROC 0.500 | AUC-PR {no_skill:.4f} "
-      f"(prevalence) | Brier {no_skill * (1 - no_skill):.4f}")
+print(
+    f"   No-skill reference lines — AUC-ROC 0.500 | AUC-PR {no_skill:.4f} "
+    f"(prevalence) | Brier {no_skill * (1 - no_skill):.4f}"
+)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -653,13 +759,15 @@ print(f"   No-skill reference lines — AUC-ROC 0.500 | AUC-PR {no_skill:.4f} "
 # ─────────────────────────────────────────────────────────────
 
 print("✅ DeLong test (H1 — XGBoost AUC vs baselines):")
-print(f"   {'Comparison':<40} {'AUC A':>8} {'AUC B':>8} {'z':>8} {'p-value':>10} {'sig':>5}")
+print(
+    f"   {'Comparison':<40} {'AUC A':>8} {'AUC B':>8} {'z':>8} {'p-value':>10} {'sig':>5}"
+)
 print("   " + "─" * 85)
 
 comparisons = [
     ("XGBoost vs Logistic Regression", xgb_proba, lr_proba),
-    ("XGBoost vs Random Forest",       xgb_proba, rf_proba),
-    ("XGBoost vs LightGBM",            xgb_proba, lgbm_proba),
+    ("XGBoost vs Random Forest", xgb_proba, rf_proba),
+    ("XGBoost vs LightGBM", xgb_proba, lgbm_proba),
 ]
 
 for label, pa, pb in comparisons:
@@ -680,9 +788,9 @@ print("   " + "─" * 65)
 for label, pa, pb in comparisons:
     la = (pa >= 0.5).astype(int)
     lb = (pb >= 0.5).astype(int)
-    p, b, c = stats_validation.mcnemar_test(y_test.values, la, lb,
-                            label.split(" vs ")[0],
-                            label.split(" vs ")[1])
+    p, b, c = stats_validation.mcnemar_test(
+        y_test.values, la, lb, label.split(" vs ")[0], label.split(" vs ")[1]
+    )
     sig = "✅" if p < 0.05 else "ns"
     print(f"   {label:<40} {b:>6} {c:>6} {p:>10.4f} {sig:>5}")
 
@@ -698,8 +806,11 @@ for label, pa, pb in comparisons:
 # releases no demographics under its data protection rules, so programme and
 # cohort year are what remain. Any demographic column that appears later is
 # picked up automatically.
-fairness_cols = [c for c in ["programme", "cohort_year", "gender", "age_band", "region"]
-                 if c in raw_df.columns]
+fairness_cols = [
+    c
+    for c in ["programme", "cohort_year", "gender", "age_band", "region"]
+    if c in raw_df.columns
+]
 test_groups = raw_df.loc[X_test.index, fairness_cols].reset_index(drop=True)
 xgb_test_labels = (xgb_proba >= 0.5).astype(int)
 y_test_arr = y_test.values
@@ -707,13 +818,23 @@ y_test_arr = y_test.values
 print("✅ Fairness disaggregation (FNR prioritised):")
 for gcol in fairness_cols:
     print(f"\n   ── By {gcol} ──")
-    fair_df = stats_validation.fairness_metrics(y_test_arr, xgb_test_labels, gcol, test_groups)
+    fair_df = stats_validation.fairness_metrics(
+        y_test_arr, xgb_test_labels, gcol, test_groups
+    )
     print(fair_df.to_string(index=False))
-    max_eod = fair_df["EqualOpportunityDiff"].max() if "EqualOpportunityDiff" in fair_df else 0
+    max_eod = (
+        fair_df["EqualOpportunityDiff"].max()
+        if "EqualOpportunityDiff" in fair_df
+        else 0
+    )
     if max_eod > 0.10:
-        print(f"   ⚠️  Equal Opportunity Difference = {max_eod:.3f} (>0.10 — investigate bias)")
+        print(
+            f"   ⚠️  Equal Opportunity Difference = {max_eod:.3f} (>0.10 — investigate bias)"
+        )
     else:
-        print(f"   ✅ Equal Opportunity Difference = {max_eod:.3f} (within acceptable range)")
+        print(
+            f"   ✅ Equal Opportunity Difference = {max_eod:.3f} (within acceptable range)"
+        )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -723,7 +844,8 @@ for gcol in fairness_cols:
 # (baseline_xgboost.run_ablation_study)
 # ─────────────────────────────────────────────────────────────
 ablation_df = baseline_xgboost.run_ablation_study(
-    X, y, ALL_NUMERIC, CATEGORICAL_COLS, MODEL_FEATURES, best_xgb_params, spw, SEED)
+    X, y, ALL_NUMERIC, CATEGORICAL_COLS, MODEL_FEATURES, best_xgb_params, spw, SEED
+)
 ablation_df.to_csv(os.path.join(RESULTS_DIR, "ablation_table.csv"), index=False)
 print(f"✅ Ablation study ({baseline_xgboost.N_CV_FOLDS}-fold CV AUC-PR):")
 print(ablation_df.to_string(index=False))
@@ -788,30 +910,28 @@ print("✅ " + RESULTS_DIR + "/config.yaml saved — commit this to GitHub.")
 CLEAN_RUN = os.environ.get("CLEAN_RUN") == "1"
 
 checks = [
-    ("Libraries imported and seeds set",         True),
-    ("Schema defined (features + target)",       True),
-    ("Synthetic data generated (SDV)",           True),
-    ("Feature engineering applied",              True),
-    ("Preprocessing pipeline built",             True),
-    ("Stratified 70/15/15 split",                True),
-    ("Temporal split (cohort_year present)",
-     "cohort_year" in raw_df.columns),
-    ("Temporal validation (past → latest cohort)",
-     temporal_df is not None),
-    ("Baseline models trained + evaluated",      True),
-    ("Hyperparameter grid search (AUC-PR)",      True),
-    ("XGBoost trained + evaluated",              True),
+    ("Libraries imported and seeds set", True),
+    ("Schema defined (features + target)", True),
+    ("Synthetic data generated (SDV)", True),
+    ("Feature engineering applied", True),
+    ("Preprocessing pipeline built", True),
+    ("Stratified 70/15/15 split", True),
+    ("Temporal split (cohort_year present)", "cohort_year" in raw_df.columns),
+    ("Temporal validation (past → latest cohort)", temporal_df is not None),
+    ("Baseline models trained + evaluated", True),
+    ("Hyperparameter grid search (AUC-PR)", True),
+    ("XGBoost trained + evaluated", True),
     ("Class-wise metrics (confusion matrix, sensitivity/specificity)", True),
-    ("Repeated-seed variance (10 runs)",         True),
-    ("SHAP computed (global + per-student)",     True),
-    ("SHAP dependence plots (top-3)",            True),
-    ("Calibration (Brier + curves)",             True),
-    ("ROC + PR curves",                          True),
-    ("DeLong test for AUC comparison",           True),
-    ("McNemar test for label disagreement",      True),
-    ("Fairness (FNR/FPR/EOD) computed",          True),
-    ("Ablation study (feature groups)",          True),
-    ("config.yaml saved",                        True),
+    ("Repeated-seed variance (10 runs)", True),
+    ("SHAP computed (global + per-student)", True),
+    ("SHAP dependence plots (top-3)", True),
+    ("Calibration (Brier + curves)", True),
+    ("ROC + PR curves", True),
+    ("DeLong test for AUC comparison", True),
+    ("McNemar test for label disagreement", True),
+    ("Fairness (FNR/FPR/EOD) computed", True),
+    ("Ablation study (feature groups)", True),
+    ("config.yaml saved", True),
 ]
 
 all_pass = True
@@ -849,8 +969,12 @@ if CLEAN_RUN:
         f.write(checklist_content)
 
     if all_pass:
-        print(f"\n🎉 Stage 1 pipeline verified successfully! (Verification checklist saved → {RESULTS_DIR}/verification_checklist.txt)")
+        print(
+            f"\n🎉 Stage 1 pipeline verified successfully! (Verification checklist saved → {RESULTS_DIR}/verification_checklist.txt)"
+        )
     else:
-        print(f"\n⚠️  Stage 1 pipeline verification checks had warnings. (Details saved → {RESULTS_DIR}/verification_checklist.txt)")
+        print(
+            f"\n⚠️  Stage 1 pipeline verification checks had warnings. (Details saved → {RESULTS_DIR}/verification_checklist.txt)"
+        )
 else:
     print(checklist_content)

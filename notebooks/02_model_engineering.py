@@ -41,6 +41,7 @@ np.random.seed(SEED)
 # so `engineered_xgboost` etc. import cleanly even when this file is run on
 # its own rather than chained after Stage 1 via run_all.py.
 import sys
+
 try:
     _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if _repo_root not in sys.path:
@@ -53,7 +54,10 @@ import engineered_xgboost
 import transfer_fusion
 import model_comparison
 import prediction
-from baseline_xgboost import N_CV_FOLDS, N_CV_REPEATS  # single source of truth for the CV design
+from baseline_xgboost import (
+    N_CV_FOLDS,
+    N_CV_REPEATS,
+)  # single source of truth for the CV design
 
 # Inherited from Stage 1 when run via run_all.py; falls back to
 # results/synthetic so the metric/table paths resolve when this runs on its
@@ -64,10 +68,16 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 # Use the SAME grid-search-tuned hyperparameters as Stage 1 so the engineering
 # comparison is baseline-tuned vs pruned-tuned (only the feature set changes).
 # Falls back to the documented defaults when run standalone without Stage 1.
-XGB_PARAMS = globals().get("best_xgb_params", {
-    "n_estimators": 500, "max_depth": 6, "learning_rate": 0.05,
-    "subsample": 0.8, "colsample_bytree": 0.8,
-})
+XGB_PARAMS = globals().get(
+    "best_xgb_params",
+    {
+        "n_estimators": 500,
+        "max_depth": 6,
+        "learning_rate": 0.05,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+    },
+)
 
 # We use the FULL feature matrix and target from the main pipeline.
 # X = raw_df[ALL_FEATURES_V2]   (already defined in 01_..., Cell 7)
@@ -90,12 +100,15 @@ print("   Engineered: E-XGBoost (low-SHAP features pruned)")
 # One shared fold object — guarantees identical splits for both models.
 # Repeated so the Wilcoxon test has enough paired observations to reach
 # significance at all; see the N_CV_REPEATS note in baseline_xgboost.py.
-SKF = RepeatedStratifiedKFold(n_splits=N_CV_FOLDS, n_repeats=N_CV_REPEATS,
-                               random_state=SEED)
+SKF = RepeatedStratifiedKFold(
+    n_splits=N_CV_FOLDS, n_repeats=N_CV_REPEATS, random_state=SEED
+)
 N_PAIRED_FOLDS = N_CV_FOLDS * N_CV_REPEATS
 
-print(f"✅ Shared CV evaluator ready: {N_CV_FOLDS} folds x {N_CV_REPEATS} repeats "
-      f"= {N_PAIRED_FOLDS} paired observations (identical splits for both models).")
+print(
+    f"✅ Shared CV evaluator ready: {N_CV_FOLDS} folds x {N_CV_REPEATS} repeats "
+    f"= {N_PAIRED_FOLDS} paired observations (identical splits for both models)."
+)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -103,18 +116,32 @@ print(f"✅ Shared CV evaluator ready: {N_CV_FOLDS} folds x {N_CV_REPEATS} repea
 # Standard XGBoost, ALL features. Run first, save, never touch again.
 # ─────────────────────────────────────────────────────────────
 
-ALL_FEATURE_LIST = MODEL_FEATURES   # from Stage 1, zero-variance predictors already removed
+ALL_FEATURE_LIST = (
+    MODEL_FEATURES  # from Stage 1, zero-variance predictors already removed
+)
 
 print("PHASE 1 — Baseline XGBoost (all features), locking results...")
 baseline_cv_results = engineered_xgboost.run_cv(
-    ALL_FEATURE_LIST, X, y, ALL_NUMERIC, CATEGORICAL_COLS, XGB_PARAMS, SKF, SEED, "BASELINE")
+    ALL_FEATURE_LIST,
+    X,
+    y,
+    ALL_NUMERIC,
+    CATEGORICAL_COLS,
+    XGB_PARAMS,
+    SKF,
+    SEED,
+    "BASELINE",
+)
 
 # Lock immediately to disk
 json.dump(
     {k: [float(v) for v in vals] for k, vals in baseline_cv_results.items()},
-    open(os.path.join(RESULTS_DIR, "baseline_metrics.json"), "w"), indent=2
+    open(os.path.join(RESULTS_DIR, "baseline_metrics.json"), "w"),
+    indent=2,
 )
-print(f"✅ Baseline LOCKED → {RESULTS_DIR}/baseline_metrics.json ({len(ALL_FEATURE_LIST)} features)")
+print(
+    f"✅ Baseline LOCKED → {RESULTS_DIR}/baseline_metrics.json ({len(ALL_FEATURE_LIST)} features)"
+)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -125,7 +152,8 @@ print(f"✅ Baseline LOCKED → {RESULTS_DIR}/baseline_metrics.json ({len(ALL_FE
 # ─────────────────────────────────────────────────────────────
 
 enc_importance = engineered_xgboost.rank_shap_importance(
-    X, y, preprocessor, XGB_PARAMS, FEATURE_NAMES, SEED)
+    X, y, preprocessor, XGB_PARAMS, FEATURE_NAMES, SEED
+)
 
 print("✅ SHAP importance computed (encoded features).")
 print("\n   Top 10 encoded features:")
@@ -166,19 +194,24 @@ for feat, c in cum.items():
 # We REMOVE the lowest-SHAP features so the model is leaner and its
 # explanations are cleaner for allied health educators — without losing accuracy.
 # This single modification creates E-XGBoost.
-KEEP_CUM_THRESHOLD = engineered_xgboost.KEEP_CUM_THRESHOLD   # keep features explaining 95% of SHAP mass
+KEEP_CUM_THRESHOLD = (
+    engineered_xgboost.KEEP_CUM_THRESHOLD
+)  # keep features explaining 95% of SHAP mass
 # ========================================================================
 
 kept_features, pruned_features, cum = engineered_xgboost.select_pruned_features(
-    orig_importance, ALL_FEATURE_LIST, KEEP_CUM_THRESHOLD)
+    orig_importance, ALL_FEATURE_LIST, KEEP_CUM_THRESHOLD
+)
 
 # `pruned_features` = the features E-XGBoost REMOVES for the current data.
 # This is the definitive "what we removed" list (data-dependent, not fixed).
 # Full feature dictionary of all 39 candidates: see 01_pipeline_and_experiments.py.
 print("✅ ENGINEERING DECISION applied (Operation R — Remove):")
-print(f"   Threshold: keep features explaining {KEEP_CUM_THRESHOLD:.0%} of SHAP importance")
+print(
+    f"   Threshold: keep features explaining {KEEP_CUM_THRESHOLD:.0%} of SHAP importance"
+)
 print(f"   KEPT    ({len(kept_features)}): {kept_features}")
-print(f"   PRUNED  ({len(pruned_features)}): {pruned_features}")   # ← features removed
+print(f"   PRUNED  ({len(pruned_features)}): {pruned_features}")  # ← features removed
 
 
 # ─────────────────────────────────────────────────────────────
@@ -194,21 +227,49 @@ print("PHASE 2 — E-XGBoost (SHAP-pruned features)...")
 # selection is what controls the optimism bias, more than nesting the
 # hyperparameter search. This is the arm that produces the reported comparison.
 engineered_cv_results, fold_selections = engineered_xgboost.run_nested_cv(
-    X, y, ALL_NUMERIC, CATEGORICAL_COLS, ALL_FEATURE_LIST, XGB_PARAMS, SKF,
-    SEED, KEEP_CUM_THRESHOLD, "E-XGBoost (nested selection)", ranking="shap")
+    X,
+    y,
+    ALL_NUMERIC,
+    CATEGORICAL_COLS,
+    ALL_FEATURE_LIST,
+    XGB_PARAMS,
+    SKF,
+    SEED,
+    KEEP_CUM_THRESHOLD,
+    "E-XGBoost (nested selection)",
+    ranking="shap",
+)
 
 # Gain-ranked arm on identical folds. Wang et al. (2024) report importance-based
 # selection outperforming SHAP-based selection; that is only answerable with
 # both measured the same way.
 gain_cv_results, gain_selections = engineered_xgboost.run_nested_cv(
-    X, y, ALL_NUMERIC, CATEGORICAL_COLS, ALL_FEATURE_LIST, XGB_PARAMS, SKF,
-    SEED, KEEP_CUM_THRESHOLD, "Gain-pruned (comparator)", ranking="gain")
+    X,
+    y,
+    ALL_NUMERIC,
+    CATEGORICAL_COLS,
+    ALL_FEATURE_LIST,
+    XGB_PARAMS,
+    SKF,
+    SEED,
+    KEEP_CUM_THRESHOLD,
+    "Gain-pruned (comparator)",
+    ranking="gain",
+)
 
 # The unnested run is retained for transparency: the gap between it and the
 # nested run is the size of the selection bias at this sample size.
 unnested_cv_results = engineered_xgboost.run_cv(
-    kept_features, X, y, ALL_NUMERIC, CATEGORICAL_COLS, XGB_PARAMS, SKF, SEED,
-    "E-XGBoost (unnested, biased)")
+    kept_features,
+    X,
+    y,
+    ALL_NUMERIC,
+    CATEGORICAL_COLS,
+    XGB_PARAMS,
+    SKF,
+    SEED,
+    "E-XGBoost (unnested, biased)",
+)
 
 # ── Transfer fusion arms ────────────────────────────────────────────────
 # The data-handling strategy is intermediate/transfer fusion: a generated source
@@ -219,23 +280,51 @@ unnested_cv_results = engineered_xgboost.run_cv(
 # contribution is measured rather than assumed.
 print("\nTRANSFER FUSION — pre-train on generated source, fine-tune on field...")
 baseline_transfer_results = transfer_fusion.run_transfer_cv(
-    ALL_FEATURE_LIST, X, y, ALL_NUMERIC, CATEGORICAL_COLS, XGB_PARAMS, SKF,
-    SEED, TARGET, "BASELINE + transfer", engineered_xgboost._build_preprocessor)
+    ALL_FEATURE_LIST,
+    X,
+    y,
+    ALL_NUMERIC,
+    CATEGORICAL_COLS,
+    XGB_PARAMS,
+    SKF,
+    SEED,
+    TARGET,
+    "BASELINE + transfer",
+    engineered_xgboost._build_preprocessor,
+)
 
 engineered_transfer_results = transfer_fusion.run_transfer_cv(
-    kept_features, X, y, ALL_NUMERIC, CATEGORICAL_COLS, XGB_PARAMS, SKF,
-    SEED, TARGET, "E-XGBoost + transfer", engineered_xgboost._build_preprocessor)
+    kept_features,
+    X,
+    y,
+    ALL_NUMERIC,
+    CATEGORICAL_COLS,
+    XGB_PARAMS,
+    SKF,
+    SEED,
+    TARGET,
+    "E-XGBoost + transfer",
+    engineered_xgboost._build_preprocessor,
+)
 
-json.dump({k: [float(v) for v in vals] for k, vals in baseline_transfer_results.items()},
-          open(os.path.join(RESULTS_DIR, "baseline_transfer_metrics.json"), "w"), indent=2)
-json.dump({k: [float(v) for v in vals] for k, vals in engineered_transfer_results.items()},
-          open(os.path.join(RESULTS_DIR, "engineered_transfer_metrics.json"), "w"), indent=2)
+json.dump(
+    {k: [float(v) for v in vals] for k, vals in baseline_transfer_results.items()},
+    open(os.path.join(RESULTS_DIR, "baseline_transfer_metrics.json"), "w"),
+    indent=2,
+)
+json.dump(
+    {k: [float(v) for v in vals] for k, vals in engineered_transfer_results.items()},
+    open(os.path.join(RESULTS_DIR, "engineered_transfer_metrics.json"), "w"),
+    indent=2,
+)
 
 fusion_contribution = model_comparison.summarise_with_ci(
-    baseline_transfer_results, metrics=("auc_roc", "auc_pr"))
+    baseline_transfer_results, metrics=("auc_roc", "auc_pr")
+)
 fusion_contribution.insert(0, "Arm", "Baseline + transfer fusion")
 field_only = model_comparison.summarise_with_ci(
-    baseline_cv_results, metrics=("auc_roc", "auc_pr"))
+    baseline_cv_results, metrics=("auc_roc", "auc_pr")
+)
 field_only.insert(0, "Arm", "Baseline, field data only")
 fusion_table = pd.concat([field_only, fusion_contribution], ignore_index=True)
 fusion_table.to_csv(os.path.join(RESULTS_DIR, "fusion_contribution.csv"), index=False)
@@ -246,24 +335,33 @@ stability = engineered_xgboost.selection_stability(fold_selections, ALL_FEATURE_
 stability.to_csv(os.path.join(RESULTS_DIR, "feature_stability.csv"), index=False)
 always = int((stability.retention_rate == 1.0).sum())
 never = int((stability.retention_rate == 0.0).sum())
-print(f"✅ Feature-set stability across {len(fold_selections)} folds → feature_stability.csv")
-print(f"   retained in every fold: {always} | never retained: {never} | "
-      f"unstable: {len(stability) - always - never}")
+print(
+    f"✅ Feature-set stability across {len(fold_selections)} folds → feature_stability.csv"
+)
+print(
+    f"   retained in every fold: {always} | never retained: {never} | "
+    f"unstable: {len(stability) - always - never}"
+)
 
 json.dump(
     {k: [float(v) for v in vals] for k, vals in engineered_cv_results.items()},
-    open(os.path.join(RESULTS_DIR, "engineered_metrics.json"), "w"), indent=2
+    open(os.path.join(RESULTS_DIR, "engineered_metrics.json"), "w"),
+    indent=2,
 )
 json.dump(
     {k: [float(v) for v in vals] for k, vals in gain_cv_results.items()},
-    open(os.path.join(RESULTS_DIR, "gain_pruned_metrics.json"), "w"), indent=2
+    open(os.path.join(RESULTS_DIR, "gain_pruned_metrics.json"), "w"),
+    indent=2,
 )
 json.dump(
     {k: [float(v) for v in vals] for k, vals in unnested_cv_results.items()},
-    open(os.path.join(RESULTS_DIR, "unnested_metrics.json"), "w"), indent=2
+    open(os.path.join(RESULTS_DIR, "unnested_metrics.json"), "w"),
+    indent=2,
 )
-print(f"✅ E-XGBoost results saved → {RESULTS_DIR}/engineered_metrics.json "
-      f"(mean {np.mean(engineered_cv_results['n_features']):.1f} features across folds)")
+print(
+    f"✅ E-XGBoost results saved → {RESULTS_DIR}/engineered_metrics.json "
+    f"(mean {np.mean(engineered_cv_results['n_features']):.1f} features across folds)"
+)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -276,13 +374,16 @@ b = json.load(open(os.path.join(RESULTS_DIR, "baseline_metrics.json")))
 e = json.load(open(os.path.join(RESULTS_DIR, "engineered_metrics.json")))
 
 comparison = model_comparison.compare_baseline_vs_engineered(
-    b, e, ALL_FEATURE_LIST, kept_features)
+    b, e, ALL_FEATURE_LIST, kept_features
+)
 comparison.to_csv(os.path.join(RESULTS_DIR, "comparison_table.csv"), index=False)
 
 print("=" * 78)
 print("TABLE 1 - XGBoost (Baseline) vs E-XGBoost (Engineered)")
-print(f"{N_CV_FOLDS}-fold stratified CV x {N_CV_REPEATS} repeats = {N_PAIRED_FOLDS} paired folds"
-      f" | identical splits | Wilcoxon signed-rank test")
+print(
+    f"{N_CV_FOLDS}-fold stratified CV x {N_CV_REPEATS} repeats = {N_PAIRED_FOLDS} paired folds"
+    f" | identical splits | Wilcoxon signed-rank test"
+)
 print("=" * 78)
 print(comparison.to_string(index=False))
 print(f"\n✅ Comparison table saved → {RESULTS_DIR}/comparison_table.csv")
@@ -294,20 +395,24 @@ print(f"\n✅ Comparison table saved → {RESULTS_DIR}/comparison_table.csv")
 # ─────────────────────────────────────────────────────────────
 
 paragraph = model_comparison.generate_results_paragraph(
-    b, e, ALL_FEATURE_LIST, kept_features, KEEP_CUM_THRESHOLD, N_PAIRED_FOLDS)
+    b, e, ALL_FEATURE_LIST, kept_features, KEEP_CUM_THRESHOLD, N_PAIRED_FOLDS
+)
 n_removed = len(ALL_FEATURE_LIST) - len(kept_features)
 
 # The summary is stamped with the run's own provenance, exactly as the figure
 # captions are, so a paragraph copied out of it cannot lose its data-source
 # label on the way into the thesis.
-SOURCE_NOTE_TEXT = globals().get("SOURCE_NOTE", "SYNTHETIC DATA — pipeline testing only")
+SOURCE_NOTE_TEXT = globals().get(
+    "SOURCE_NOTE", "SYNTHETIC DATA — pipeline testing only"
+)
 DATA_SOURCE_LABEL = globals().get("DATA_SOURCE", "synthetic")
 OBSERVED_OUTCOME_SOURCE = "real"
 
 if DATA_SOURCE_LABEL == OBSERVED_OUTCOME_SOURCE:
     OUTCOME_CAVEAT = (
         "OBSERVED licensure outcomes from the registrar's return.\n"
-        "     Reportable as findings: YES.")
+        "     Reportable as findings: YES."
+    )
 else:
     OUTCOME_CAVEAT = (
         "SIMULATED LICENSURE OUTCOMES — reportable as findings: NO.\n"
@@ -316,7 +421,8 @@ else:
         "     GENERATED. Every AUC, p-value and pruned feature set above is\n"
         "     therefore illustrative only. When the college returns the real\n"
         "     outcomes, the SHAP rankings will differ and will determine which\n"
-        "     features are actually pruned.")
+        "     features are actually pruned."
+    )
 
 contribution_block = f"""
   Data source       : {DATA_SOURCE_LABEL} — {SOURCE_NOTE_TEXT}
@@ -354,7 +460,9 @@ with open(summary_path, "w", encoding="utf-8") as f:
 
 CLEAN_RUN = os.environ.get("CLEAN_RUN") == "1"
 if CLEAN_RUN:
-    print(f"✅ Academic results paragraph and defense summary saved → {RESULTS_DIR}/academic_summary.txt")
+    print(
+        f"✅ Academic results paragraph and defense summary saved → {RESULTS_DIR}/academic_summary.txt"
+    )
 else:
     print(paragraph)
     print("=" * 70)
@@ -376,8 +484,17 @@ else:
 
 ex_spw = globals().get("spw", 1)
 ex_model, ex_pre, ex_feature_names = engineered_xgboost.train_engineered_model(
-    X_train, y_train, X_val, y_val, kept_features,
-    ALL_NUMERIC, CATEGORICAL_COLS, XGB_PARAMS, ex_spw, SEED)
+    X_train,
+    y_train,
+    X_val,
+    y_val,
+    kept_features,
+    ALL_NUMERIC,
+    CATEGORICAL_COLS,
+    XGB_PARAMS,
+    ex_spw,
+    SEED,
+)
 
 EX_BUNDLE = {
     "model": ex_model,
@@ -392,5 +509,7 @@ EX_BUNDLE = {
     "model_name": "E-XGBoost",
 }
 prediction.save_bundle(EX_BUNDLE, os.path.join(RESULTS_DIR, "inference_bundle.pkl"))
-print(f"✅ E-XGBoost inference bundle saved → {RESULTS_DIR}/inference_bundle.pkl "
-      f"({len(kept_features)} retained features; the app now serves E-XGBoost)")
+print(
+    f"✅ E-XGBoost inference bundle saved → {RESULTS_DIR}/inference_bundle.pkl "
+    f"({len(kept_features)} retained features; the app now serves E-XGBoost)"
+)

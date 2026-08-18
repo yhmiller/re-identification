@@ -16,6 +16,7 @@ with a load of the anonymised records and the same to_common_schema() applies.
 
 Run:  ml_env/bin/python notebooks/03_hybrid_transfer.py
 """
+
 from pathlib import Path
 
 import numpy as np
@@ -43,13 +44,19 @@ TARGET = "fail"
 AGE_BANDS = ["Below 20", "20-24", "25-29", "30+"]
 GENDERS = ["Female", "Male"]
 
-WEAK_SCORE = 50          # a subject score below this counts as "weak" (matches Stage 0)
-SYNTH_COLLEGE_N = 250    # stand-in until the real records arrive
+WEAK_SCORE = 50  # a subject score below this counts as "weak" (matches Stage 0)
+SYNTH_COLLEGE_N = 250  # stand-in until the real records arrive
 PRETRAIN_ROUNDS = 200
 FINETUNE_ROUNDS = 100
-XGB_PARAMS = dict(max_depth=3, learning_rate=0.05, subsample=0.8,
-                  colsample_bytree=0.8, eval_metric="aucpr",
-                  random_state=SEED, verbosity=0)
+XGB_PARAMS = dict(
+    max_depth=3,
+    learning_rate=0.05,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    eval_metric="aucpr",
+    random_state=SEED,
+    verbosity=0,
+)
 
 
 def make_synthetic_college(n):
@@ -59,8 +66,10 @@ def make_synthetic_college(n):
     mock = np.clip(rng.normal(58, 15, (n, 6)), 10, 100)
 
     df = pd.DataFrame(
-        {**{f"ca_{i+1}": ca[:, i] for i in range(6)},
-         **{f"mock_{i+1}": mock[:, i] for i in range(6)}}
+        {
+            **{f"ca_{i+1}": ca[:, i] for i in range(6)},
+            **{f"mock_{i+1}": mock[:, i] for i in range(6)},
+        }
     )
     df["age_band"] = rng.choice(AGE_BANDS, n, p=[0.10, 0.55, 0.25, 0.10])
     df["gender"] = rng.choice(GENDERS, n, p=[0.72, 0.28])
@@ -78,8 +87,8 @@ def to_common_schema(college_df):
     ca_cols = [f"ca_{i+1}" for i in range(6)]
     mock_cols = [f"mock_{i+1}" for i in range(6)]
     out = pd.DataFrame()
-    out["prior_score_1"] = college_df[mock_cols].mean(axis=1)         # ~ mock_avg
-    out["prior_score_2"] = college_df[ca_cols].mean(axis=1)           # ~ ca_avg
+    out["prior_score_1"] = college_df[mock_cols].mean(axis=1)  # ~ mock_avg
+    out["prior_score_2"] = college_df[ca_cols].mean(axis=1)  # ~ ca_avg
     out["prior_failures"] = (college_df[mock_cols] < WEAK_SCORE).sum(axis=1)
     out["age_band"] = college_df["age_band"]
     out["gender"] = college_df["gender"]
@@ -88,15 +97,25 @@ def to_common_schema(college_df):
 
 
 def build_preprocessor():
-    numeric = Pipeline([("imp", SimpleImputer(strategy="median")),
-                        ("sc", MinMaxScaler())])
-    categorical = Pipeline([
-        ("imp", SimpleImputer(strategy="most_frequent")),
-        ("oh", OneHotEncoder(categories=[AGE_BANDS, GENDERS],
-                             handle_unknown="ignore", sparse_output=False)),
-    ])
-    return ColumnTransformer([("num", numeric, NUMERIC_FEATURES),
-                              ("cat", categorical, CATEGORICAL_FEATURES)])
+    numeric = Pipeline(
+        [("imp", SimpleImputer(strategy="median")), ("sc", MinMaxScaler())]
+    )
+    categorical = Pipeline(
+        [
+            ("imp", SimpleImputer(strategy="most_frequent")),
+            (
+                "oh",
+                OneHotEncoder(
+                    categories=[AGE_BANDS, GENDERS],
+                    handle_unknown="ignore",
+                    sparse_output=False,
+                ),
+            ),
+        ]
+    )
+    return ColumnTransformer(
+        [("num", numeric, NUMERIC_FEATURES), ("cat", categorical, CATEGORICAL_FEATURES)]
+    )
 
 
 def evaluate(model, X, y, label):
@@ -120,8 +139,12 @@ def main():
     y_pub = public[TARGET].values
 
     Xc_train, Xc_test, yc_train, yc_test = train_test_split(
-        college[COMMON_FEATURES], college[TARGET],
-        test_size=0.30, stratify=college[TARGET], random_state=SEED)
+        college[COMMON_FEATURES],
+        college[TARGET],
+        test_size=0.30,
+        stratify=college[TARGET],
+        random_state=SEED,
+    )
     Xc_train_p = pre.transform(Xc_train)
     Xc_test_p = pre.transform(Xc_test)
 
@@ -131,7 +154,8 @@ def main():
 
     # College-only baseline (no transfer) — the control.
     college_only = xgb.XGBClassifier(
-        n_estimators=PRETRAIN_ROUNDS + FINETUNE_ROUNDS, **XGB_PARAMS)
+        n_estimators=PRETRAIN_ROUNDS + FINETUNE_ROUNDS, **XGB_PARAMS
+    )
     college_only.fit(Xc_train_p, yc_train)
 
     # FINE-TUNE: continue boosting the pre-trained model on the college data.
@@ -141,8 +165,10 @@ def main():
     print("\nEvaluation on the held-out COLLEGE test split:")
     evaluate(college_only, Xc_test_p, yc_test, "College-only (no transfer)")
     evaluate(hybrid, Xc_test_p, yc_test, "Hybrid (pre-train + fine-tune)")
-    print("\nNote: synthetic-college numbers are illustrative only; the real "
-          "transfer benefit is measured once the college records arrive.")
+    print(
+        "\nNote: synthetic-college numbers are illustrative only; the real "
+        "transfer benefit is measured once the college records arrive."
+    )
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ model E-XGBoost (engineered_xgboost.py) is compared against. Used by
 notebooks/01_pipeline_and_experiments.py, and reused as-is for the Option 2
 pipeline-replication run on synthetic/public data (see docs/TODO.md).
 """
+
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
@@ -22,8 +23,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
-from sklearn.metrics import (average_precision_score, brier_score_loss,
-                              roc_auc_score)
+from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
 
 from stats_validation import evaluate_model
 
@@ -64,31 +64,40 @@ XGB_PARAM_GRID = {
 
 def build_preprocessor(all_numeric, categorical_cols):
     """Impute → scale numeric; impute → one-hot categorical. (was CELL 8)"""
-    numeric_transformer = Pipeline(steps=[
-        ("imputer", SimpleImputer(strategy="median")),
-        ("scaler", MinMaxScaler()),
-    ])
-    categorical_transformer = Pipeline(steps=[
-        ("imputer", SimpleImputer(strategy="most_frequent")),
-        ("encoder", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
-    ])
-    return ColumnTransformer(transformers=[
-        ("num", numeric_transformer, all_numeric),
-        ("cat", categorical_transformer, categorical_cols),
-    ], remainder="drop")
+    numeric_transformer = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", MinMaxScaler()),
+        ]
+    )
+    categorical_transformer = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("encoder", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+        ]
+    )
+    return ColumnTransformer(
+        transformers=[
+            ("num", numeric_transformer, all_numeric),
+            ("cat", categorical_transformer, categorical_cols),
+        ],
+        remainder="drop",
+    )
 
 
 def encoded_feature_names(preprocessor, all_numeric, categorical_cols):
-    cat_features = (preprocessor
-                    .named_transformers_["cat"]
-                    .named_steps["encoder"]
-                    .get_feature_names_out(categorical_cols)
-                    .tolist())
+    cat_features = (
+        preprocessor.named_transformers_["cat"]
+        .named_steps["encoder"]
+        .get_feature_names_out(categorical_cols)
+        .tolist()
+    )
     return all_numeric + cat_features
 
 
-def train_comparator_baselines(X_train_proc, y_train, X_val_proc, y_val,
-                                X_test_proc, y_test, seed):
+def train_comparator_baselines(
+    X_train_proc, y_train, X_val_proc, y_val, X_test_proc, y_test, seed
+):
     """Logistic Regression, Random Forest, LightGBM. (was CELL 10)
 
     Returns (results: list[dict], models: dict[name, fitted estimator],
@@ -97,25 +106,38 @@ def train_comparator_baselines(X_train_proc, y_train, X_val_proc, y_val,
     lr = LogisticRegression(max_iter=1000, random_state=seed, class_weight="balanced")
     lr.fit(X_train_proc, y_train)
     lr_proba = lr.predict_proba(X_test_proc)[:, 1]
-    lr_res = evaluate_model("Logistic Regression", y_test, lr_proba, lr.predict(X_test_proc))
+    lr_res = evaluate_model(
+        "Logistic Regression", y_test, lr_proba, lr.predict(X_test_proc)
+    )
 
-    rf = RandomForestClassifier(n_estimators=500, n_jobs=-1, random_state=seed,
-                                 class_weight="balanced")
+    rf = RandomForestClassifier(
+        n_estimators=500, n_jobs=-1, random_state=seed, class_weight="balanced"
+    )
     rf.fit(X_train_proc, y_train)
     rf_proba = rf.predict_proba(X_test_proc)[:, 1]
     rf_res = evaluate_model("Random Forest", y_test, rf_proba, rf.predict(X_test_proc))
 
-    lgbm_clf = lgb.LGBMClassifier(n_estimators=500, random_state=seed,
-                                   verbose=-1, class_weight="balanced")
-    lgbm_clf.fit(X_train_proc, y_train,
-                 eval_set=[(X_val_proc, y_val)],
-                 callbacks=[lgb.early_stopping(50, verbose=False)])
+    lgbm_clf = lgb.LGBMClassifier(
+        n_estimators=500, random_state=seed, verbose=-1, class_weight="balanced"
+    )
+    lgbm_clf.fit(
+        X_train_proc,
+        y_train,
+        eval_set=[(X_val_proc, y_val)],
+        callbacks=[lgb.early_stopping(50, verbose=False)],
+    )
     lgbm_proba = lgbm_clf.predict_proba(X_test_proc)[:, 1]
-    lgbm_res = evaluate_model("LightGBM", y_test, lgbm_proba, lgbm_clf.predict(X_test_proc))
+    lgbm_res = evaluate_model(
+        "LightGBM", y_test, lgbm_proba, lgbm_clf.predict(X_test_proc)
+    )
 
     results = [lr_res, rf_res, lgbm_res]
     models = {"Logistic Regression": lr, "Random Forest": rf, "LightGBM": lgbm_clf}
-    probas = {"Logistic Regression": lr_proba, "Random Forest": rf_proba, "LightGBM": lgbm_proba}
+    probas = {
+        "Logistic Regression": lr_proba,
+        "Random Forest": rf_proba,
+        "LightGBM": lgbm_proba,
+    }
     return results, models, probas
 
 
@@ -126,8 +148,13 @@ def tune_xgboost(X_train_proc, y_train, seed):
     spw = round(neg / pos, 2) if pos > 0 else 1
 
     grid = GridSearchCV(
-        xgb.XGBClassifier(scale_pos_weight=spw, eval_metric="aucpr",
-                           random_state=seed, verbosity=0, use_label_encoder=False),
+        xgb.XGBClassifier(
+            scale_pos_weight=spw,
+            eval_metric="aucpr",
+            random_state=seed,
+            verbosity=0,
+            use_label_encoder=False,
+        ),
         XGB_PARAM_GRID,
         scoring="average_precision",
         cv=StratifiedKFold(n_splits=N_CV_FOLDS, shuffle=True, random_state=seed),
@@ -137,8 +164,17 @@ def tune_xgboost(X_train_proc, y_train, seed):
     return grid.best_params_, spw, grid
 
 
-def train_xgboost(X_train_proc, y_train, X_val_proc, y_val, X_test_proc, y_test,
-                   best_params, spw, seed):
+def train_xgboost(
+    X_train_proc,
+    y_train,
+    X_val_proc,
+    y_val,
+    X_test_proc,
+    y_test,
+    best_params,
+    spw,
+    seed,
+):
     """Final XGBoost fit with early stopping on validation AUC-PR. (was CELL 11)
 
     Returns (model, result_dict, proba, labels).
@@ -160,21 +196,29 @@ def train_xgboost(X_train_proc, y_train, X_val_proc, y_val, X_test_proc, y_test,
     return xgb_clf, xgb_res, xgb_proba, xgb_labels
 
 
-def repeated_seed_variance(X_train_proc, y_train, X_test_proc, y_test,
-                            best_params, spw, n_runs=10):
+def repeated_seed_variance(
+    X_train_proc, y_train, X_test_proc, y_test, best_params, spw, n_runs=10
+):
     """Retrain under N random seeds; report metric spread. (was CELL 11.5)"""
     rows = []
     for s in range(n_runs):
-        m = xgb.XGBClassifier(**best_params, scale_pos_weight=spw,
-                               eval_metric="aucpr", random_state=s,
-                               verbosity=0, use_label_encoder=False)
+        m = xgb.XGBClassifier(
+            **best_params,
+            scale_pos_weight=spw,
+            eval_metric="aucpr",
+            random_state=s,
+            verbosity=0,
+            use_label_encoder=False,
+        )
         m.fit(X_train_proc, y_train)
         p = m.predict_proba(X_test_proc)[:, 1]
-        rows.append({
-            "seed": s,
-            "auc_roc": round(roc_auc_score(y_test, p), 4),
-            "auc_pr": round(average_precision_score(y_test, p), 4),
-        })
+        rows.append(
+            {
+                "seed": s,
+                "auc_roc": round(roc_auc_score(y_test, p), 4),
+                "auc_pr": round(average_precision_score(y_test, p), 4),
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -200,19 +244,28 @@ def temporal_validation(raw_df, X, y, preprocessor, best_params, spw, seed):
     pre_t = clone(preprocessor)
     Xtr_t = pre_t.fit_transform(X_train_t)
     Xte_t = pre_t.transform(X_test_t)
-    m_t = xgb.XGBClassifier(**best_params, scale_pos_weight=spw,
-                             eval_metric="aucpr", random_state=seed,
-                             verbosity=0, use_label_encoder=False)
+    m_t = xgb.XGBClassifier(
+        **best_params,
+        scale_pos_weight=spw,
+        eval_metric="aucpr",
+        random_state=seed,
+        verbosity=0,
+        use_label_encoder=False,
+    )
     m_t.fit(Xtr_t, y_train_t)
     p_t = m_t.predict_proba(Xte_t)[:, 1]
-    return pd.DataFrame([{
-        "train_cohorts": ",".join(str(int(yr)) for yr in years[:-1]),
-        "test_cohort": int(latest),
-        "n_train": int(len(X_train_t)),
-        "n_test": int(len(X_test_t)),
-        "auc_roc": round(roc_auc_score(y_test_t, p_t), 4),
-        "auc_pr": round(average_precision_score(y_test_t, p_t), 4),
-    }])
+    return pd.DataFrame(
+        [
+            {
+                "train_cohorts": ",".join(str(int(yr)) for yr in years[:-1]),
+                "test_cohort": int(latest),
+                "n_train": int(len(X_train_t)),
+                "n_test": int(len(X_test_t)),
+                "auc_roc": round(roc_auc_score(y_test_t, p_t), 4),
+                "auc_pr": round(average_precision_score(y_test_t, p_t), 4),
+            }
+        ]
+    )
 
 
 def calibrate(fitted_model, X_val, y_val, X_test, y_test, method="isotonic"):
@@ -234,31 +287,53 @@ def calibrate(fitted_model, X_val, y_val, X_test, y_test, method="isotonic"):
     prevalence = float(y_test.mean())
     brier_no_skill = prevalence * (1 - prevalence)
     brier = brier_score_loss(y_test, proba)
-    return calibrator, {
-        "method": method,
-        "brier": round(brier, 4),
-        "brier_no_skill": round(brier_no_skill, 4),
-        "brier_skill_score": round(1 - brier / brier_no_skill, 4),
-        "auc_roc": round(roc_auc_score(y_test, proba), 4),
-        "auc_pr": round(average_precision_score(y_test, proba), 4),
-    }, proba
+    return (
+        calibrator,
+        {
+            "method": method,
+            "brier": round(brier, 4),
+            "brier_no_skill": round(brier_no_skill, 4),
+            "brier_skill_score": round(1 - brier / brier_no_skill, 4),
+            "auc_roc": round(roc_auc_score(y_test, proba), 4),
+            "auc_pr": round(average_precision_score(y_test, proba), 4),
+        },
+        proba,
+    )
 
 
-def ablation_auc_pr(feature_subset, X, y, all_numeric, categorical_cols,
-                     best_params, spw, seed):
+def ablation_auc_pr(
+    feature_subset, X, y, all_numeric, categorical_cols, best_params, spw, seed
+):
     """N_CV_FOLDS-fold CV mean/std AUC-PR for one feature subset (no leakage). (was CELL 18.5)"""
     num_sub = [c for c in feature_subset if c in all_numeric]
     cat_sub = [c for c in feature_subset if c in categorical_cols]
     transformers = []
     if num_sub:
-        transformers.append(("num", Pipeline([
-            ("imp", SimpleImputer(strategy="median")),
-            ("sc", MinMaxScaler())]), num_sub))
+        transformers.append(
+            (
+                "num",
+                Pipeline(
+                    [("imp", SimpleImputer(strategy="median")), ("sc", MinMaxScaler())]
+                ),
+                num_sub,
+            )
+        )
     if cat_sub:
-        transformers.append(("cat", Pipeline([
-            ("imp", SimpleImputer(strategy="most_frequent")),
-            ("oh", OneHotEncoder(handle_unknown="ignore", sparse_output=False))]),
-            cat_sub))
+        transformers.append(
+            (
+                "cat",
+                Pipeline(
+                    [
+                        ("imp", SimpleImputer(strategy="most_frequent")),
+                        (
+                            "oh",
+                            OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                        ),
+                    ]
+                ),
+                cat_sub,
+            )
+        )
     pre = ColumnTransformer(transformers, remainder="drop")
     skf = StratifiedKFold(n_splits=N_CV_FOLDS, shuffle=True, random_state=seed)
     Xsub = X[feature_subset]
@@ -266,43 +341,59 @@ def ablation_auc_pr(feature_subset, X, y, all_numeric, categorical_cols,
     for tr_idx, te_idx in skf.split(Xsub, y):
         Xtr = pre.fit_transform(Xsub.iloc[tr_idx])
         Xte = pre.transform(Xsub.iloc[te_idx])
-        m = xgb.XGBClassifier(**best_params, scale_pos_weight=spw,
-                               eval_metric="aucpr", random_state=seed,
-                               verbosity=0, use_label_encoder=False)
+        m = xgb.XGBClassifier(
+            **best_params,
+            scale_pos_weight=spw,
+            eval_metric="aucpr",
+            random_state=seed,
+            verbosity=0,
+            use_label_encoder=False,
+        )
         m.fit(Xtr, y.iloc[tr_idx])
-        scores.append(average_precision_score(
-            y.iloc[te_idx], m.predict_proba(Xte)[:, 1]))
+        scores.append(
+            average_precision_score(y.iloc[te_idx], m.predict_proba(Xte)[:, 1])
+        )
     return float(np.mean(scores)), float(np.std(scores))
 
 
-def run_ablation_study(X, y, all_numeric, categorical_cols, all_features,
-                        best_params, spw, seed):
+def run_ablation_study(
+    X, y, all_numeric, categorical_cols, all_features, best_params, spw, seed
+):
     """Run the fixed set of ablation variants and return a results table."""
+
     # Each variant isolates one block of the feature set. "CGPA only" is the
     # floor: if the full model cannot beat a single cumulative average, the
     # semester detail and grade distribution are not earning their place.
     def without(*fragments):
-        return [f for f in all_features
-                if not any(frag in f for frag in fragments)]
+        return [f for f in all_features if not any(frag in f for frag in fragments)]
 
     variants = {
         "All features": all_features,
         "CGPA only": [f for f in all_features if f == "cgpa"],
-        "No semester trajectory": without("gpa_sem", "weak_sem", "gpa_trend",
-                                           "gpa_consistency", "gpa_first_half",
-                                           "gpa_final_half"),
-        "No grade distribution": without("n_grade_", "prop_grade_",
-                                          "n_failed", "fail_rate"),
+        "No semester trajectory": without(
+            "gpa_sem",
+            "weak_sem",
+            "gpa_trend",
+            "gpa_consistency",
+            "gpa_first_half",
+            "gpa_final_half",
+        ),
+        "No grade distribution": without(
+            "n_grade_", "prop_grade_", "n_failed", "fail_rate"
+        ),
     }
     variants = {name: feats for name, feats in variants.items() if feats}
     rows = []
     for name, feats in variants.items():
-        mean_pr, std_pr = ablation_auc_pr(feats, X, y, all_numeric, categorical_cols,
-                                           best_params, spw, seed)
-        rows.append({
-            "variant": name,
-            "n_features": len(feats),
-            "auc_pr_mean": round(mean_pr, 4),
-            "auc_pr_std": round(std_pr, 4),
-        })
+        mean_pr, std_pr = ablation_auc_pr(
+            feats, X, y, all_numeric, categorical_cols, best_params, spw, seed
+        )
+        rows.append(
+            {
+                "variant": name,
+                "n_features": len(feats),
+                "auc_pr_mean": round(mean_pr, 4),
+                "auc_pr_std": round(std_pr, 4),
+            }
+        )
     return pd.DataFrame(rows)

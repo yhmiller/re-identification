@@ -34,6 +34,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
+
 warnings.filterwarnings("ignore")
 
 SEED = 42
@@ -49,37 +50,37 @@ print("✅ Stage 0 ready — data preparation + EDA")
 # ─────────────────────────────────────────────────────────────
 
 # Path to the raw file the college gives you (Excel or CSV)
-RAW_DATA_PATH = "raw_college_records.xlsx"      # ← EDIT
+RAW_DATA_PATH = "raw_college_records.xlsx"  # ← EDIT
 
 # Map the COLLEGE'S column names → the pipeline's schema names.
 # Left side = exactly what appears in their file (check spelling!).
 # Right side = pipeline schema. Fill in after you see the real file.
 COLUMN_MAPPING = {
     # identity (will be hashed then dropped)
-    "Index Number":            "student_id",
+    "Index Number": "student_id",
     # predictors
-    "WASSCE Aggregate":        "wassce_aggregate",
-    "CGPA":                    "programme_cgpa",
-    "CA Medical Surgical":     "ca_medical_surgical",
-    "CA Mental Health":        "ca_mental_health",
-    "CA Paediatric":           "ca_paediatric",
-    "CA Public Health":        "ca_public_health",
-    "CA Obstetric":            "ca_obstetric",
-    "CA Pharmacology":         "ca_pharmacology",
-    "Mock Medical Surgical":   "mock_medical_surgical",
-    "Mock Mental Health":      "mock_mental_health",
-    "Mock Paediatric":         "mock_paediatric",
-    "Mock Public Health":      "mock_public_health",
-    "Mock Obstetric":          "mock_obstetric",
-    "Mock Pharmacology":       "mock_pharmacology",
-    "Programme":               "programme_type",
-    "Age":                     "age_raw",          # converted to age_band below
-    "Sex":                     "gender",
-    "Region":                  "region",
-    "Year Group":              "cohort_year",
+    "WASSCE Aggregate": "wassce_aggregate",
+    "CGPA": "programme_cgpa",
+    "CA Medical Surgical": "ca_medical_surgical",
+    "CA Mental Health": "ca_mental_health",
+    "CA Paediatric": "ca_paediatric",
+    "CA Public Health": "ca_public_health",
+    "CA Obstetric": "ca_obstetric",
+    "CA Pharmacology": "ca_pharmacology",
+    "Mock Medical Surgical": "mock_medical_surgical",
+    "Mock Mental Health": "mock_mental_health",
+    "Mock Paediatric": "mock_paediatric",
+    "Mock Public Health": "mock_public_health",
+    "Mock Obstetric": "mock_obstetric",
+    "Mock Pharmacology": "mock_pharmacology",
+    "Programme": "programme_type",
+    "Age": "age_raw",  # converted to age_band below
+    "Sex": "gender",
+    "Region": "region",
+    "Year Group": "cohort_year",
     # outcome
-    "Result Status":           "result_status",     # e.g. PASS/FAIL/ABSENT/WITHHELD
-    "Papers Failed":           "papers_failed",     # count, if provided
+    "Result Status": "result_status",  # e.g. PASS/FAIL/ABSENT/WITHHELD
+    "Papers Failed": "papers_failed",  # count, if provided
 }
 
 # Values in result_status that mean the candidate has NO valid
@@ -89,7 +90,7 @@ EXCLUDE_STATUSES = ["ABSENT", "DEFERRED", "WITHHELD", "INCOMPLETE", "PENDING"]
 # How to derive the binary target (pick ONE that matches their file):
 #   "status"  → fail = 1 if result_status == "FAIL"
 #   "papers"  → fail = 1 if papers_failed >= 1
-TARGET_RULE = "status"                              # ← EDIT if needed
+TARGET_RULE = "status"  # ← EDIT if needed
 
 # Subjects and per-subject columns come from the single source of truth,
 # schema.py at the repo root (edit exam papers there, not here).
@@ -106,8 +107,14 @@ except NameError:
 # Pinned locally rather than imported: schema.py now describes the semester-GPA
 # feature set the college actually released, while this stage still documents
 # the subject-score format it was written for. See the header note.
-NMC_SUBJECTS = ["medical_surgical", "mental_health", "paediatric",
-                "public_health", "obstetric", "pharmacology"]
+NMC_SUBJECTS = [
+    "medical_surgical",
+    "mental_health",
+    "paediatric",
+    "public_health",
+    "obstetric",
+    "pharmacology",
+]
 CA_COLS = [f"ca_{s}" for s in NMC_SUBJECTS]
 MOCK_COLS = [f"mock_{s}" for s in NMC_SUBJECTS]
 
@@ -139,8 +146,11 @@ for col in ["result_status", "programme_type", "gender", "region"]:
         df[col] = df[col].astype(str).str.strip().str.upper()
 
 # Coerce numerics
-for col in ["wassce_aggregate", "programme_cgpa", "papers_failed",
-            "age_raw", "cohort_year"] + CA_COLS + MOCK_COLS:
+for col in (
+    ["wassce_aggregate", "programme_cgpa", "papers_failed", "age_raw", "cohort_year"]
+    + CA_COLS
+    + MOCK_COLS
+):
     if col in df.columns:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
@@ -205,8 +215,9 @@ else:
 # Age band from raw age (matches the questionnaire bands)
 if "age_raw" in df.columns and df["age_raw"].notna().any():
     df["age_band"] = pd.cut(
-        df["age_raw"], bins=[0, 19, 24, 29, 200],
-        labels=["Below 20", "20-24", "25-29", "30+"]
+        df["age_raw"],
+        bins=[0, 19, 24, 29, 200],
+        labels=["Below 20", "20-24", "25-29", "30+"],
     ).astype(str)
 elif "age_band" not in df.columns:
     df["age_band"] = "UNKNOWN"
@@ -230,21 +241,24 @@ else:
 
 # A fixed study salt: prevents anyone re-hashing known index numbers
 # to re-identify rows. Keep this string PRIVATE (do not publish).
-STUDY_SALT = "MILLER-22388461-AHPC-2026"           # ← keep private
+STUDY_SALT = "MILLER-22388461-AHPC-2026"  # ← keep private
 # #TODO - Read from .env - untracked file
+
 
 def pseudonymise(value: str) -> str:
     return hashlib.sha256((STUDY_SALT + str(value)).encode()).hexdigest()[:16]
+
 
 df["pseudo_id"] = df["student_id"].apply(pseudonymise)
 
 # Drop every identifying / non-model column
 DROP_COLS = ["student_id", "age_raw", "result_status", "papers_failed"]
-extra_identifiers = [c for c in df.columns
-                     if any(k in c.lower() for k in
-                            ["name", "phone", "email", "contact", "address"])]
-df = df.drop(columns=[c for c in DROP_COLS + extra_identifiers
-                      if c in df.columns])
+extra_identifiers = [
+    c
+    for c in df.columns
+    if any(k in c.lower() for k in ["name", "phone", "email", "contact", "address"])
+]
+df = df.drop(columns=[c for c in DROP_COLS + extra_identifiers if c in df.columns])
 
 print("✅ Anonymisation complete.")
 print(f"   pseudo_id sample: {df['pseudo_id'].iloc[0]}")
@@ -304,9 +318,7 @@ else:
 print("✅ Failure rate by group (report in thesis):")
 for gcol in ["programme_type", "gender", "age_band", "cohort_year"]:
     if gcol in df.columns:
-        tab = (df.groupby(gcol)["fail"]
-                 .agg(n="count", fail_rate="mean")
-                 .round(3))
+        tab = df.groupby(gcol)["fail"].agg(n="count", fail_rate="mean").round(3)
         print(f"\n   ── by {gcol} ──")
         print(tab.to_string())
         tab.to_csv(f"eda_failrate_by_{gcol}.csv")
@@ -317,21 +329,31 @@ for gcol in ["programme_type", "gender", "age_band", "cohort_year"]:
 # ─────────────────────────────────────────────────────────────
 
 df["_mock_avg"] = df[MOCK_COLS].mean(axis=1)
-candidate_cols = [("programme_cgpa", "Programme CGPA"),
-                  ("wassce_aggregate", "WASSCE Aggregate"),
-                  ("_mock_avg", "Mock Exam Average")]
+candidate_cols = [
+    ("programme_cgpa", "Programme CGPA"),
+    ("wassce_aggregate", "WASSCE Aggregate"),
+    ("_mock_avg", "Mock Exam Average"),
+]
 plot_cols = [(c, t) for c, t in candidate_cols if c in df.columns]
 
-fig, axes = plt.subplots(1, len(plot_cols), figsize=(5.4 * len(plot_cols), 4.5),
-                          squeeze=False)
+fig, axes = plt.subplots(
+    1, len(plot_cols), figsize=(5.4 * len(plot_cols), 4.5), squeeze=False
+)
 axes = axes.ravel()
 
 for ax, (col, title) in zip(axes, plot_cols):
     for val, lab, color in [(0, "Pass", "#2E7D32"), (1, "Fail", "#C62828")]:
-        ax.hist(df.loc[df["fail"] == val, col].dropna(),
-                bins=20, alpha=0.55, label=lab, color=color)
+        ax.hist(
+            df.loc[df["fail"] == val, col].dropna(),
+            bins=20,
+            alpha=0.55,
+            label=lab,
+            color=color,
+        )
     ax.set_title(f"{title} by Licensure Outcome")
-    ax.set_xlabel(title); ax.set_ylabel("Count"); ax.legend()
+    ax.set_xlabel(title)
+    ax.set_ylabel("Count")
+    ax.legend()
 
 plt.tight_layout()
 plt.savefig("eda_distributions.png", dpi=150, bbox_inches="tight")
@@ -348,8 +370,14 @@ corr_cols = numeric_cols + ["fail"]
 corr = df[corr_cols].corr().round(2)
 
 plt.figure(figsize=(12, 9))
-sns.heatmap(corr, cmap="RdBu_r", center=0, annot=False,
-            linewidths=0.4, cbar_kws={"label": "Pearson r"})
+sns.heatmap(
+    corr,
+    cmap="RdBu_r",
+    center=0,
+    annot=False,
+    linewidths=0.4,
+    cbar_kws={"label": "Pearson r"},
+)
 plt.title("Correlation Matrix — Predictors and Licensure Failure")
 plt.tight_layout()
 plt.savefig("eda_correlation.png", dpi=150, bbox_inches="tight")
