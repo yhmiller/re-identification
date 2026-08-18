@@ -37,14 +37,17 @@ replicates the core finding: banding cuts uniqueness from 13.6% to 3.7%, the
 reconstruction attack restores it to 12.6%, and 85.0% of grades are recovered
 exactly with containment at 100%.
 
-- [ ] Add a `load_public()` loader beside the two existing strata.
-- [ ] Sequence columns are G1 to G3, so the derived-feature functions need to
-      accept a three-element sequence. `derive_features` already generalises;
-      confirm the first-half and final-half split behaves sensibly at length 3.
-- [ ] Re-run notebooks 04 to 07 with three strata.
-- [ ] Record the demographic quasi-identifier result separately. It answers a
-      question the Ghanaian data cannot: what happens when age and address sit
-      beside grades.
+- [x] Add a `load_public()` loader beside the two existing strata.
+- [x] Sequence columns are G1 to G3. `derive_features` handles a three-element
+      sequence; the halves split one and two, so `gpa_trend` is asymmetric.
+      Defensible, and stated in the write-up rather than left implicit.
+- [x] Re-run notebooks 04 to 07 with three strata.
+- [x] Record the demographic quasi-identifier result separately. Demographics
+      narrow a linkage candidate set from 354 records to 17, which grades alone
+      never achieve in that corpus.
+- [x] Two bugs the third corpus exposed and both now fixed: band widths and
+      recall tolerances were absolute rather than scale-relative, and the
+      sensitive-attribute threshold broke on tied integer grades.
 
 Note in writing: the public arm is a **replication**, not a pooled sample. The
 grading scales and sequence lengths differ, so the three strata are never merged.
@@ -64,11 +67,13 @@ Experiment C becomes the contribution. Experiment B becomes its ablation. That
 is the baseline-versus-engineered spine both templates are built around, with no
 new experiments required.
 
+- [x] Consolidate the artefact into `derivation_consistent.py`, so the thing the
+      title names has one home. `risk_utility` now delegates to it.
+- [x] Draft two objectives alongside the existing six, not replacing them.
 - [ ] Confirm the title and objectives with the supervisor before drafting.
       Title, objectives and §8 must agree.
-- [ ] Adopt the proposed title in
-      `NewDirection/thesis-topic-reidentification.md` only once agreed.
-- [ ] Reduce six objectives to two.
+- [ ] Adopt the proposed title and the two objectives together, only once
+      agreed. Both are drafted and waiting in the topic document.
 
 ## Stage 3. Statistical testing
 

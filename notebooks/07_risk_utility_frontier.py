@@ -25,6 +25,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+import derivation_consistent as dc  # noqa: E402
 import risk_utility as ru  # noqa: E402
 import strata as st  # noqa: E402
 
@@ -44,16 +45,16 @@ def configs_for(stratum):
     """Release configurations, with band widths scaled to the corpus."""
     narrow, mid, wide = stratum.band_widths
     return [
-        ("original, no protection", None, None, "none"),
-        (f"band {narrow:g}", narrow, None, "none"),
-        (f"band {mid:g}", mid, None, "none"),
-        (f"band {wide:g}", wide, None, "none"),
-        (f"band {mid:g} + suppress k<3", mid, 3, "none"),
-        (f"band {mid:g} + suppress k<5", mid, 5, "none"),
-        (f"band {mid:g} + derived from originals", mid, None, "leaky"),
-        (f"band {mid:g} + derived from bands", mid, None, "safe"),
-        (f"band {wide:g} + derived from originals", wide, None, "leaky"),
-        (f"band {wide:g} + derived from bands", wide, None, "safe"),
+        ("original, no protection", None, None, dc.NONE),
+        (f"band {narrow:g}", narrow, None, dc.NONE),
+        (f"band {mid:g}", mid, None, dc.NONE),
+        (f"band {wide:g}", wide, None, dc.NONE),
+        (f"band {mid:g} + suppress k<3", mid, 3, dc.NONE),
+        (f"band {mid:g} + suppress k<5", mid, 5, dc.NONE),
+        (f"band {mid:g} + baseline derivation", mid, None, dc.BASELINE),
+        (f"band {mid:g} + proposed derivation", mid, None, dc.PROPOSED),
+        (f"band {wide:g} + baseline derivation", wide, None, dc.BASELINE),
+        (f"band {wide:g} + proposed derivation", wide, None, dc.PROPOSED),
     ]
 
 
@@ -149,16 +150,16 @@ def main():
                 f"{r['auc_pr_retained']:>6.1%} utility kept"
             )
 
-        dominated_leaky = [
+        dominated_baseline = [
             r["config"]
             for _, r in candidates.iterrows()
-            if r["derived_mode"] == "leaky"
+            if r["derived_mode"] == dc.BASELINE
             and r["config"] not in [f["config"] for f in frontier]
         ]
-        if dominated_leaky:
+        if dominated_baseline:
             print(
-                f"    dominated, publishing derived features from originals: "
-                f"{len(dominated_leaky)} configuration(s)"
+                f"    dominated, baseline derivation: "
+                f"{len(dominated_baseline)} configuration(s)"
             )
 
     out = pd.concat(all_rows, ignore_index=True)

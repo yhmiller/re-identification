@@ -27,6 +27,7 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.model_selection import RepeatedStratifiedKFold
 from xgboost import XGBClassifier
 
+import derivation_consistent as dc
 import deidentify as di
 import disclosure_risk as dr
 
@@ -89,32 +90,14 @@ def cross_validated_utility(X, y, seed=BASE_SEED):
 
 
 def apply_release(frame, semester_cols, band_width, suppress_k, derived_mode):
-    """Build the file a custodian would actually hand out.
+    """Build the file a custodian would hand out.
 
-    `derived_mode` is the decision Experiment B made consequential:
-        none        publish no derived features
-        leaky       derive from the originals, then publish alongside the bands
-        safe        derive from the generalised values instead
+    Delegates to `derivation_consistent.build`, which is the engineered
+    artefact. Kept as a thin wrapper so the frontier code reads in the same
+    shape it always did.
     """
-    released = frame.copy()
-    suppressed = 0
-
-    if band_width:
-        released = di.generalise(released, semester_cols, band_width)
-
-    if suppress_k and suppress_k > 1:
-        released, suppressed = di.suppress(released, semester_cols, suppress_k)
-
-    derived = None
-    if derived_mode == "leaky":
-        derived = di.derive_features(frame, semester_cols)
-    elif derived_mode == "safe":
-        derived = di.derive_features(released, semester_cols)
-
-    if derived is not None:
-        released = released.drop(columns=derived.columns, errors="ignore").join(derived)
-
-    return released, suppressed
+    release = dc.build(frame, semester_cols, band_width, suppress_k, derived_mode)
+    return release.frame, release.records_suppressed
 
 
 def frontier_row(
@@ -128,15 +111,10 @@ def frontier_row(
     derived_mode="none",
 ):
     """One point on the frontier: what this configuration protects, and costs."""
-    released, suppressed = apply_release(
-        frame, semester_cols, band_width, suppress_k, derived_mode
-    )
+    release = dc.build(frame, semester_cols, band_width, suppress_k, derived_mode)
+    released, suppressed = release.frame, release.records_suppressed
 
-    # Risk is measured on everything the recipient can see.
-    visible = list(semester_cols)
-    if derived_mode != "none":
-        visible += di.DERIVED_COLUMNS
-    risk = dr.risk_profile(released, visible)
+    risk = dr.risk_profile(released, release.visible_columns)
 
     # Utility uses only the predictors, which the model would actually consume.
     usable = released[predictors].join(frame[[target]]).dropna()
@@ -157,7 +135,7 @@ def frontier_row(
         "config": label,
         "band_width": band_width or 0.0,
         "suppress_k": suppress_k or 0,
-        "derived_mode": derived_mode,
+        "derived_mode": release.mode,
         "records_suppressed": suppressed,
         "n_modelled": len(usable),
         "prop_unique": risk.prop_unique,

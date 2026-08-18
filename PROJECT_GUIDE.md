@@ -168,10 +168,14 @@ Full plan: [NewDirection/writing-plan.md](NewDirection/writing-plan.md).
 
 ## Contribution defence
 
-The engineered artefact is **derivation-consistent generalisation**: one
-modification to a standard de-identification pipeline, in which features derived
-from a protected variable are recomputed from the protected values rather than
-from the originals.
+The engineered artefact is **derivation-consistent generalisation**, implemented
+in [derivation_consistent.py](derivation_consistent.py): one modification to a
+standard de-identification pipeline, in which features derived from a protected
+variable are recomputed from the protected values rather than from the originals.
+
+Only the derivation step differs between the two arms. Banding, suppression, the
+risk metrics and the utility model are identical, so any difference in disclosure
+risk is attributable to the derivation source and nothing else.
 
 - **Baseline.** Standard generalisation. Bands the source variables, publishes
   derived features at original precision. This is what pipelines do today.

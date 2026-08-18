@@ -55,6 +55,8 @@ Both assumptions are questionable. A derived feature computed at full precision 
 
 ## 3. Aim and objectives
 
+**Current, in use.**
+
 Aim: to quantify re-identification risk in Ghanaian health professions education records, establish whether derived features undermine de-identification of the source data and produce an evidence-based de-identification standard that preserves analytical utility.
 
 Objectives:
@@ -65,6 +67,26 @@ Objectives:
 4. Validate the theoretical risk through a simulated linkage attack under realistic side-knowledge assumptions.
 5. Optimise de-identification to maximise retained analytical utility subject to a defined risk ceiling and characterise the resulting risk-utility frontier.
 6. Turn the findings into an operational de-identification standard for Ghanaian health training institutions.
+
+**Proposed, not yet adopted.**
+
+The Q1 methods template caps a manuscript at three objectives and states that two
+is best. Each must map onto a specific methods subsection, and each must name the
+single engineering operation the title names. Six objectives describe a study;
+two describe a contribution. Adopt these only alongside the proposed title, since
+title, objectives and Methods section 8 must all name the same operation.
+
+1. To develop a derivation-consistent generalisation procedure for student
+   academic records, in which features derived from a generalised variable are
+   recomputed from the protected values rather than from the originals.
+2. To quantify the disclosure risk and the analytical utility of that procedure
+   against standard generalisation, using hybrid public and institutional
+   academic data.
+
+The six above are not discarded. Objectives 1, 2 and 4 become results reported
+under proposed objective 2; objective 3 becomes the ablation; objective 5 becomes
+the risk-utility frontier; objective 6 becomes the practical contribution in the
+discussion.
 
 ## 4. Research questions
 
