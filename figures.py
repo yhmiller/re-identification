@@ -1,7 +1,18 @@
-"""Figures for the manuscript.
+"""Figures and tables for the manuscript.
 
-One function per figure, each returning the path it wrote. Four figures, each
-carrying one story:
+One function per item, each returning the path it wrote. `build_all` produces
+every one in manuscript order, so the whole set regenerates with one command and
+no image can drift out of step with the table it came from.
+
+Methods items describe the procedure and are drawn:
+
+    architecture           the four phases end to end
+    replication            three corpora, no fusion point
+    baseline_vs_proposed   the two releases with the modified step marked
+    algorithm_box          the procedure, modification at line 3
+    table_1_corpora        corpus descriptives, generated from the corpora
+
+Results items plot measurements and are read from the result tables:
 
     mechanism    what the derived features do to the protection
     frontier     the decision a custodian actually faces
@@ -408,7 +419,13 @@ def figure_explanation():
 
 
 def build_all():
+    """Every figure and table, methods first then results."""
     return [
+        figure_architecture(),
+        figure_replication(),
+        figure_baseline_vs_proposed(),
+        algorithm_box(),
+        table_1_corpora(),
         figure_mechanism(),
         figure_frontier(),
         figure_stability(),
@@ -416,9 +433,6 @@ def build_all():
     ]
 
 
-if __name__ == "__main__":
-    for path in build_all():
-        print(f"wrote {path.relative_to(ROOT)}")
 
 
 # ---------------------------------------------------------------------------
@@ -645,3 +659,8 @@ def table_1_corpora():
     path = RESULTS / "table_1_corpora.md"
     path.write_text("\n".join(lines) + "\n")
     return path
+
+
+if __name__ == "__main__":
+    for path in build_all():
+        print(f"wrote {path.relative_to(ROOT)}")

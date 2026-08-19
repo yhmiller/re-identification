@@ -270,14 +270,19 @@ are the two places the section demonstrates that the analysis checked itself.
 
 ### Still needed alongside
 
-- [ ] Figure 1, architecture. Four phases end to end
-- [ ] Figure 2, replication across three corpora, no fusion point
-- [ ] Figure 3, baseline against proposed with the modified step marked
-- [ ] Algorithm 1, with the modification identified at line 3
-- [ ] Table 1, corpus descriptives
+- [x] Figure 1, architecture. Four phases end to end
+- [x] Figure 2, replication across three corpora, no fusion point
+- [x] Figure 3, baseline against proposed with the modified step marked
+- [x] Algorithm 1, modification identified at line 3, text in the manuscript
+      and a rendered box for layout
+- [x] Table 1, corpus descriptives, generated from the corpora rather than typed
 - [ ] Ethics reference number, replacing the visible `[REF]` marker
 
-## Stage 6. Results section
+Placement rules verified: every figure and table is referenced in the text
+before it appears, each carries a caption below it, none is an orphan, and no
+invented ethics number appears anywhere in the file.
+
+## Stage 6. Results section. NEXT
 
 Target 1,500 to 2,000 words, 4 to 8 citations, five to seven figures and tables.
 
