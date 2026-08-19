@@ -482,6 +482,22 @@ Neither blocks writing, and both strengthen the Discussion.
 - **Read `MOCK QUESTIONS_THESIS EXAMINERS & Q1 JOURNAL REVIEWER.pdf`** before
   drafting the Discussion, and answer each question the analysis can answer.
 
+### Literature search, done as a scoping search
+
+`literature/` holds a protocol, a verbatim query log, annotated sources and a gap
+analysis. It is a structured scoping search over the open web, not a systematic
+review, and the protocol states what must be added before that word is used.
+
+It changed the thesis. One gap claim survives narrowed, one narrows materially,
+and the contribution claim is reframed from novelty to transfer.
+
+- [ ] Read the ten sources marked critical in `literature/sources.md`. Nothing
+      is currently based on more than an abstract
+- [ ] Run the database searches listed in `literature/protocol.md`
+- [ ] Apply the revised wording from `literature/gap-analysis.md` to the topic
+      document, the introduction and the contribution list
+- [ ] Add DeSIA and the cell-key literature to the Methods citations
+
 ## Sequence
 
 Stages 1 and 2 first, because everything downstream depends on the framing and
