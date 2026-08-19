@@ -42,9 +42,11 @@ than from the originals. It closes the hole at no cost in model utility.
 
 > **Scope note.** This replaced an earlier study predicting licensure failure
 > from the same records, which could not proceed because the outcome column was
-> never returned. Nothing was deleted: the pre-pivot codebase is tagged
-> `scope/licensure-prediction` and the outcome tooling is in
-> [archive/licensure-outcome/](archive/licensure-outcome/).
+> never returned. Nothing was deleted. This repository was cloned from the
+> earlier one, so the whole history came across: the pre-pivot codebase is at
+> the tag `scope/licensure-prediction`, and the outcome tooling is at
+> `f00df56:archive/licensure-outcome/`. Recover any of it with
+> `git show <commit>:<path>`.
 
 ---
 

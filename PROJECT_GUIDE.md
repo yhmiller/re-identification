@@ -24,10 +24,13 @@ never returned the outcome column, and without a dependent variable nothing
 could be estimated. The present study has no dependent variable at all, so the
 same blockage cannot recur.
 
-Nothing from the earlier scope was deleted. The pre-pivot codebase is tagged
-`scope/licensure-prediction`, and the outcome-simulation tooling sits in
-[archive/licensure-outcome/](archive/licensure-outcome/) with a README
-explaining what each file was for.
+Nothing from the earlier scope was deleted. This repository is a clone of the
+one that held it, so the history came across intact. The pre-pivot codebase is
+at the tag `scope/licensure-prediction`. The outcome-simulation tooling, with
+a README explaining what each file was for, is at
+`f00df56:archive/licensure-outcome/`. Read any of it with
+`git show f00df56:archive/licensure-outcome/README.md`, or recover the whole
+directory with `git checkout f00df56 -- archive/`.
 
 ---
 
