@@ -6,30 +6,33 @@ Compiled: 16 August 2026
 
 ## Title
 
-**Current, in use:**
+**Adopted.**
 
-Re-identification Risk in Ghanaian Health Professions Education Records: Do Derived Features Undermine De-identification?
-
-**Proposed, not yet adopted:**
-
-Derivation-Consistent De-identification of Health Professions Education Records: Disclosure Risk and Analytical Utility Under Hybrid Public and Institutional Academic Data
-
-The proposed title follows the Q1 methods template formula, which requires the
-manuscript to name one engineered artefact rather than a question, and to signal
-hybrid public plus field data. Switching to it commits the study to the single
-engineering operation implemented in `derivation_consistent.py`. Do not adopt it
-until that framing is agreed, because the title, the objectives and Section 8 of
-the methods must match or the manuscript is desk-rejected on the mismatch.
-
-An earlier draft of this title said "Anonymisation". That word is now avoided
-throughout. The study measures *residual* re-identification risk, and the
-proposed method reduces that risk without eliminating it. Calling the output
-anonymous invites the question "anonymous in what sense", which is a terminology
-argument that distracts from the contribution. The code uses
-"derivation-consistent generalisation"; the title uses "de-identification" as the
-broader operation; neither claims anonymity.
+Derivation-Consistent De-identification of Health Professions Education Records:
+Disclosure Risk and Analytical Utility Under Hybrid Public and Institutional
+Academic Data
 
 Short title: Derivation-consistent de-identification of academic records
+
+### Why it changed
+
+The earlier title was a question: *Re-identification Risk in Ghanaian Health
+Professions Education Records: Do Derived Features Undermine De-identification?*
+It was carried while the framing was open.
+
+The Q1 methods marking scheme settled it. Item A8 fails a draft outright when the
+title and objectives do not name the F/M/R/S operation described in Section 8 of
+the Methods. A question names no operation, so the earlier title failed the gate
+regardless of the content beneath it. The title, the two objectives and Methods
+Section 2.8 now all name the same Modify [M] operation.
+
+"Anonymisation" was avoided throughout in favour of "de-identification". The
+study measures *residual* risk and the proposed method reduces it without
+eliminating it, so claiming anonymity would invite an argument about a word that
+has no bearing on the contribution.
+
+**This change was not a free choice and the supervisor was told it was open.**
+It should be reported to them rather than left to be noticed.
 
 ## Summary
 
@@ -127,41 +130,38 @@ narrow this claim further. That is expected rather than a risk.
 
 ## 3. Aim and objectives
 
-**Current, in use.**
+**Aim.** To determine whether features derived from unprotected source values
+undermine the generalisation applied to those values, and to evaluate a
+derivation-consistent alternative in terms of disclosure risk and analytical
+utility.
 
-Aim: to quantify residual re-identification risk in Ghanaian health professions
-education records, establish whether derived features undermine generalisation
-applied to their source variables, and evaluate a derivation-consistent
-alternative in terms of disclosure risk and analytical utility.
-
-Objectives:
-
-1. Measure baseline disclosure risk under recognised risk metrics and adversary models.
-2. Attribute that risk to specific attributes and attribute combinations.
-3. Establish whether derived academic features form an independent disclosure channel, and whether they narrow the uncertainty that generalisation introduces into their source variables.
-4. Validate measured risk against a simulated linkage attack under justified side-knowledge scenarios.
-5. Characterise the risk-utility frontier across release configurations.
-6. Propose an operational framework that institutions could use, and that could inform future guidance.
-
-**Proposed, not yet adopted.**
-
-The Q1 methods template caps a manuscript at three objectives and prefers two.
-Each must map onto a specific methods subsection and name the single engineering
-operation the title names. Adopt these only alongside the proposed title, since
-title, objectives and Methods section 8 must all agree.
+**Objectives.** Two, adopted. The Q1 methods template caps a manuscript at three
+and prefers two, and its marking scheme fails a draft outright when the title and
+objectives do not name the engineering operation described in Section 8, so this
+was settled by the scheme rather than by preference.
 
 1. To develop a derivation-consistent generalisation procedure for student
    academic records, in which features derived from a generalised variable are
    recomputed from the protected values rather than from the originals.
 2. To quantify the disclosure risk and the analytical utility of that procedure
    against standard generalisation, using hybrid public and institutional
-   academic data, and to identify the attributes and derived features that drive
-   the measured risk.
+   academic data.
 
-The six above are not discarded. Objectives 1, 2 and 4 become results reported
-under proposed objective 2; objective 3 becomes the ablation; objective 5 becomes
-the risk-utility frontier; objective 6 becomes the practical implication in the
-discussion.
+Each maps to one research question in Section 5 and to one part of the results.
+
+### What the earlier six objectives became
+
+An earlier draft carried six. Nothing measured under them is discarded; the
+change is what the thesis is organised around, not what it reports.
+
+| Earlier objective | Now |
+|---|---|
+| Measure baseline disclosure risk | Reported as context establishing the problem |
+| Attribute risk to specific attributes | Supporting finding |
+| Establish whether derived features form a disclosure channel | Folded into Objective 1, and after the literature search reported as replication rather than discovery |
+| Validate risk against a simulated linkage attack | Supporting finding, and a bound on how far measured uniqueness is realisable |
+| Characterise the risk-utility frontier | Folded into Objective 2 |
+| Propose an operational framework | Moved to future work, Section 5 |
 
 ## 4. Outcomes, ranked
 
@@ -215,17 +215,64 @@ was for.
 
 ## 5. Research questions
 
-RQ1. What proportion of records is uniquely identifiable on quasi-identifiers alone, and what is the disclosure risk under the prosecutor, journalist and marketer models?
+Two, matching the two objectives one to one. The supervisor's guidance was to
+carry two critical questions properly rather than six thinly, and the marking
+scheme's cap of three objectives points the same way.
 
-RQ2. Which attributes drive that risk, and how few does an adversary need?
+**RQ1.** Does publishing features derived from unprotected source values
+undermine the protection that generalising those values provides, and by how
+much?
 
-RQ3. Do derived academic features form an independent disclosure channel when released without the source sequence?
+*Answered by:* the reconstruction procedure, the uniqueness comparison between
+release arms, and the ablation that reverts the derivation step. Maps to
+Objective 1.
 
-RQ4. Does releasing derived features at original precision alongside generalised source variables reduce the uncertainty the generalisation introduced, and by how much?
+**RQ2.** What does derivation-consistent generalisation cost in analytical
+utility, and what risk-utility choices does it leave a data custodian?
 
-RQ5. How does risk trade against analytical utility across release configurations, and which configurations are not dominated?
+*Answered by:* the paired utility comparison, the confirmatory tests, and the
+risk-utility frontier. Maps to Objective 2.
 
-RQ6. What operational framework follows, and how does it compare with published de-identification guidance?
+### Findings reported but not framed as questions
+
+A thesis answers fewer questions than it reports findings. The following were
+research questions in an earlier draft. They are retained in the Results because
+they establish the problem RQ1 and RQ2 address, and because discarding measured
+results would be waste, but they are not claims the thesis is organised around.
+
+| Former question | Now |
+|---|---|
+| Proportion uniquely identifiable, and risk under three adversary models | Baseline context in Results, establishing that the problem exists |
+| Which attributes drive the risk, and how few an adversary needs | Supporting finding. The CGPA result motivates the choice of quasi-identifiers |
+| Whether derived features form an independent disclosure channel | Supporting finding, and after the literature search a replication of DeSIA (2025) in a new setting rather than a discovery |
+| Group size against within-group uniqueness | Supporting finding. Strong on its own terms and worth reporting, but a different question from the one the thesis answers |
+
+Demoting these is a presentational decision, not a retraction. Every number
+stands and every one is reported.
+
+### Future research directions
+
+Deferred deliberately, each with the reason.
+
+**A written de-identification framework for institutions.** The frontier supports
+one, and the practical contribution of this thesis is the measurement that would
+underpin it. Producing and validating institutional guidance is a separate piece
+of work requiring engagement with regulators.
+
+**Differential privacy as a comparator.** This study defends generalisation with
+its known weaknesses. A comparison against a formal privacy mechanism is the
+obvious next question and is out of scope here, argued in Section 10.
+
+**Whether attack realism holds outside simulation.** Side knowledge is simulated
+from within each corpus. Validating adversary assumptions against real behaviour
+needs a study design this one does not have.
+
+**Transfer to other derived-feature families.** The eight features here are the
+conventional academic set. Whether the finding holds for time-series summaries,
+embeddings or clinical derived variables is untested.
+
+**The prototype decision-support tool.** Scoped in the writing plan, scheduled
+after the written work, and droppable without loss to the thesis.
 
 ## 6. Conceptual framework
 
