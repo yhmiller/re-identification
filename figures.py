@@ -135,7 +135,7 @@ def figure_mechanism():
 
     axes[0].set_ylabel("Records uniquely identifiable", fontsize=9.5)
     axes[0].yaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
-    return _save(fig, "figure_4_mechanism")
+    return _save(fig, "figure_5_mechanism")
 
 
 def figure_frontier():
@@ -203,7 +203,7 @@ def figure_frontier():
     second = ax.legend(handles=fill_keys, fontsize=8, frameon=False,
                        loc="lower center", title="Release", title_fontsize=8.5)
     second._legend_box.align = "left"
-    return _save(fig, "figure_5_frontier")
+    return _save(fig, "figure_6_frontier")
 
 
 def figure_stability():
@@ -299,7 +299,7 @@ def figure_stability():
         ),
     ]
     ax.legend(handles=handles, fontsize=8, frameon=False, loc="lower right")
-    return _save(fig, "figure_6_stability")
+    return _save(fig, "figure_7_stability")
 
 
 def figure_explanation():
@@ -420,12 +420,13 @@ def figure_explanation():
         color="#6B7075",
         linespacing=1.5,
     )
-    return _save(fig, "figure_7_explanation")
+    return _save(fig, "figure_8_explanation")
 
 
 def build_all():
-    """Every figure and table, methods first then results."""
+    """Every figure and table, in manuscript order."""
     return [
+        figure_conceptual_framework(),
         figure_architecture(),
         figure_replication(),
         figure_baseline_vs_proposed(),
@@ -508,7 +509,7 @@ def figure_architecture():
     _box(ax, 2.6, 0.7, 4.8, 1.1,
          "Risk-utility characterisation\nacross release configurations",
          "#E8F1EC", PROPOSED, weight="bold")
-    return _save(fig, "figure_1_architecture")
+    return _save(fig, "figure_2_architecture")
 
 
 def figure_replication():
@@ -545,7 +546,7 @@ def figure_replication():
             "procedure differences that arise from the measurement scales.",
             ha="center", va="center", fontsize=8, color=INK, zorder=4,
             linespacing=1.5)
-    return _save(fig, "figure_2_replication")
+    return _save(fig, "figure_3_replication")
 
 
 def figure_baseline_vs_proposed():
@@ -587,7 +588,7 @@ def figure_baseline_vs_proposed():
     ax.text(5.0, 0.65,
             "Both releases publish the same generalised columns and the same feature names.",
             ha="center", fontsize=8.5, color=MUTED)
-    return _save(fig, "figure_3_baseline_vs_proposed")
+    return _save(fig, "figure_4_baseline_vs_proposed")
 
 
 ALGORITHM_1 = """Algorithm 1: Derivation-consistent generalisation
@@ -669,3 +670,60 @@ def table_1_corpora():
 if __name__ == "__main__":
     for path in build_all():
         print(f"wrote {path.relative_to(ROOT)}")
+
+
+def figure_conceptual_framework():
+    """The conceptual framework, for the Introduction.
+
+    Distinct from Figure 2, the study architecture, and from Figure 8, which
+    explains the mechanism once the results are in. This one states the
+    relationships the study sets out to measure, before any measurement.
+
+    Read top to bottom: a source variable is generalised, features are derived,
+    and the pair becomes the release a recipient holds. The release is then read
+    on two axes at once. The marked edge is the only one a custodian controls,
+    and it is what the study prices.
+    """
+    fig, ax = plt.subplots(figsize=(8.6, 5.6))
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 10)
+    ax.axis("off")
+
+    def box(x, y, w, h, text, face, edge, size=8.5, weight="normal"):
+        ax.add_patch(
+            plt.Rectangle((x, y), w, h, facecolor=face, edgecolor=edge,
+                          linewidth=1.3, zorder=3)
+        )
+        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center",
+                fontsize=size, color=INK, zorder=4, linespacing=1.45,
+                fontweight=weight)
+
+    box(3.2, 8.5, 3.6, 1.1, "Source variable\ngrade sequence", "#EEF1F3", MUTED)
+
+    box(3.2, 6.4, 3.6, 1.2, "GENERALISATION\nband to width w", "#EEF1F3", INK,
+        weight="bold")
+    _arrow(ax, 5.0, 8.5, 5.0, 7.6)
+
+    box(3.2, 4.3, 3.6, 1.2, "DERIVATION\nd(.) to 8 features", "#EEF1F3", INK,
+        weight="bold")
+    _arrow(ax, 5.0, 6.4, 5.0, 5.5)
+
+    # The one edge a custodian controls, and the study's whole subject.
+    ax.text(7.15, 4.9, "derived from the\nORIGINAL values\nor the PROTECTED\nvalues",
+            ha="left", va="center", fontsize=8, color="#B5484A",
+            linespacing=1.4, fontweight="bold")
+    _arrow(ax, 6.8, 4.9, 7.05, 4.9, colour="#B5484A")
+
+    box(2.9, 2.4, 4.2, 1.1, "RELEASE\nwhat the recipient holds", "#EEF1F3",
+        MUTED, weight="bold")
+    _arrow(ax, 5.0, 4.3, 5.0, 3.5)
+
+    # The release is read on two axes at once. That simultaneity is the premise.
+    box(0.2, 0.5, 3.6, 1.1, "Disclosure risk\nuniqueness, k", "#FBEDED", "#B5484A")
+    box(6.2, 0.5, 3.6, 1.1, "Analytical value\nAUC-PR", "#EAF2EC", PROPOSED)
+    _arrow(ax, 4.2, 2.4, 2.6, 1.6)
+    _arrow(ax, 5.8, 2.4, 7.4, 1.6)
+
+    ax.text(5.0, 1.05, "measured\ntogether", ha="center", va="center",
+            fontsize=8, color=MUTED, linespacing=1.4, style="italic")
+    return _save(fig, "figure_1_conceptual_framework")
