@@ -25,10 +25,19 @@ demonstrates by interval propagation.
 
 Measured across three corpora, publishing them from the originals reverses 67%
 to 100% of the protection the generalisation provided, and recovers 21% to 94%
-of individual grades exactly. Recomputing them from the bands preserves the
-protection exactly and costs nothing: model utility is identical to three
-decimal places in every configuration tested, which makes the baseline release a
-dominated choice rather than a trade-off.
+of individual grades exactly. Recomputing them from the bands holds that
+protection, and it has a price: it costs 2.7 to 13.5 AUC-PR points depending on
+the corpus. The baseline release is therefore not dominated. It sits on the
+frontier at the high-utility, low-protection end, and the contribution is the
+measured trade-off rather than a free fix.
+
+An earlier version of this docstring claimed the opposite, that utility was
+"identical to three decimal places" and the baseline was a dominated choice.
+That was an artefact of passing the utility model only the generalised source
+columns, which are byte-identical between the two arms, so the model never saw
+the one thing that differs between them. The claim was withdrawn from four
+documents in August 2026. This docstring was missed at the time and is corrected
+here. See the comment in `risk_utility.py` guarding the fixed code path.
 
 Modes
 -----
