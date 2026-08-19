@@ -9,10 +9,17 @@ de-identification applied to those grades?
 Measurably, yes, and the leak is not free to close.
 
 Publishing derived features at original precision alongside generalised source
-variables restores **98.7% to 100%** of the disclosure risk the generalisation
-removed, and **99.4% to 109.8%** of the analytical utility it removed. Those two
-figures agree because it is the same information seen from two sides. The
-generalisation is, for practical purposes, undone.
+variables restores **67% to 100%** of the disclosure risk the generalisation
+removed, and **79% to 119%** of the analytical utility it removed. On the two
+Ghanaian corpora the risk figure is 98.7% to 100%, so for the study population
+the generalisation is, for practical purposes, undone.
+
+Both quantities come back substantially, which is what one expects if the same
+information drives both. They are **not** numerically equal configuration by
+configuration and are not presented as though they were. The utility ratio has an
+unstable denominator, and it exceeds 100% in the nursing corpus because the
+baseline release carries eight derived features that the unprotected release does
+not.
 
 Recomputing the derived features from the protected values closes the leak, and
 costs **2.7 to 13.5 AUC-PR points** depending on the corpus. That is a genuine
@@ -81,7 +88,7 @@ or about Ghanaian institutions rests on it. See [strata.py](strata.py).
 | Attributes needed to reach 100% unique | 2 | 5 | 6 |
 | Uncertainty removed by baseline derivation | 100% | 98.7-100% | 67-89% |
 | Source values narrowed to a point | 20.9-33.9% | 34.1-62.8% | 74.1-93.7% |
-| Utility restored by baseline derivation | 109.8% | 99.4% | 99.5% |
+| Utility restored by baseline derivation | 79-80% | 115-119% | 93-97% |
 | Utility cost of closing the leak (AUC-PR) | -0.027 | -0.135 | -0.067 |
 
 ### What survives formal testing
