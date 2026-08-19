@@ -188,8 +188,9 @@ Analysis complete. Methods and Results drafted. Four sections still to write.
       document that carried the superseded novelty claim
 - [ ] **Ethics approval reference number.** `CHRPE/AP/XXX/26` caps the marking
       scheme at 70% against a 90% pass. The single highest-value action left
-- [ ] Read the ten sources marked critical in `docs/literature/sources.md`.
-      Every citation added from the search rests on an abstract
+- [x] Read the sources marked critical in `docs/literature/sources.md`. Done 19
+      August 2026. Nine sources, read in full. Two wrong author attributions
+      corrected. The contribution claim strengthened rather than moved
 - [ ] Run the database searches in `docs/literature/protocol.md` before the
       word "systematic" is used anywhere
 - [ ] Tell the supervisor the title changed, and why
