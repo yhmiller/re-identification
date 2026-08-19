@@ -1,15 +1,16 @@
 # 3. Results and Analysis
 
-> **Draft status.** Figures 1 to 3, Algorithm 1 and Table 1 appear in Section 2.
-> This section continues from Figure 4 and Table 2. All values are produced by
-> `notebooks/04` to `08` and `figures.py`; none is transcribed by hand.
+> **Draft status.** Figures 1 to 3, Algorithm 1 and Tables 1 to 4 appear in
+> Section 2. This section continues from Figure 4 and Table 5. All values are
+> produced by `notebooks/04` to `08` and `figures.py`; none is transcribed by
+> hand.
 
 ## 3.1 Descriptive summary of the corpora
 
 Following the consolidation described in Section 2.5, the allied health corpus
 comprised 110 students across three programmes and two cohorts, the nursing
 corpus 566 students across two academic years, and the public replication corpus
-649 students (Cortez and Silva, 2008). Corpus characteristics are given in Table 1.
+649 students (Cortez and Silva, 2008). Corpus characteristics are given in Section 2.2.
 
 The sensitive attribute, weak performance in the final observed sequence
 position, was present in 40.9%, 40.3% and 46.4% of records respectively. Median
@@ -77,7 +78,7 @@ the largest, 423 students, was 0.9% unique.
 
 ## 3.4 Baseline versus proposed release
 
-Table 2 reports the primary comparison at the middle band width of each corpus.
+Table 5 reports the primary comparison at the middle band width of each corpus.
 Uniqueness is reported for the release as a whole. AUC-PR, the primary utility
 metric on account of the class balance of the prediction task (Saito and
 Rehmsmeier, 2015), is reported as the mean across 25 cross-validation folds with
@@ -99,7 +100,7 @@ Guestrin, 2016) specified in Section 2.9.
 | | Generalised + baseline derivation | 12.6% | 0.9702 | 0.0151 |
 | | Generalised + proposed derivation | 2.2% | 0.9035 | 0.0267 |
 
-*Table 2. Disclosure risk and analytical utility under four releases, at band
+*Table 5. Disclosure risk and analytical utility under four releases, at band
 width 0.5 for the two Ghanaian corpora and 2.5 for the public corpus. AUC-PR is
 the mean across 25 folds (5 folds × 5 seeds). No-skill floors are 0.413, 0.428
 and 0.464 respectively.*
@@ -123,7 +124,7 @@ public corpus.*
 
 ## 3.5 Statistical comparison
 
-Table 3 reports the confirmatory comparisons specified in Section 2.13.
+Table 6 reports the confirmatory comparisons specified in Section 2.13.
 
 | Corpus | Band | Risk difference | 95% CI | Utility difference | 95% CI, corrected | p, corrected |
 |---|---|---|---|---|---|---|
@@ -137,7 +138,7 @@ Table 3 reports the confirmatory comparisons specified in Section 2.13.
 | | 2.50 | -0.105 | [-0.137, -0.100] | -0.067 | [-0.088, -0.045] | <0.0001 |
 | | 5.00 | -0.103 | [-0.137, -0.106] | -0.134 | [-0.162, -0.107] | <0.0001 |
 
-*Table 3. Proposed minus baseline derivation. Risk differences are in proportion
+*Table 6. Proposed minus baseline derivation. Risk differences are in proportion
 uniquely identifiable, with percentile intervals from 2000 subsamples at 80% of
 each corpus. Utility differences are in AUC-PR across 25 paired folds, with
 intervals and p values corrected for fold dependence. Effect sizes are the
@@ -185,7 +186,7 @@ zero, and are marked accordingly.
 ## 3.7 Ablation
 
 The ablation reverted the single modified step, computing derived features from
-the original rather than the generalised values. Table 4 reports the effect on
+the original rather than the generalised values. Table 7 reports the effect on
 uniqueness across all three band widths.
 
 | Corpus | Band | Unprotected | After generalisation | After reversion | Protection reversed | Values recovered exactly |
@@ -200,7 +201,7 @@ uniqueness across all three band widths.
 | | 2.50 | 13.6% | 2.2% | 12.2% | 87.8% | 83.8% |
 | | 5.00 | 13.6% | 0.9% | 9.4% | 67.1% | 74.1% |
 
-*Table 4. Ablation of the modified derivation step. Protection reversed is the
+*Table 7. Ablation of the modified derivation step. Protection reversed is the
 share of the uniqueness removed by generalisation that reverting the step
 restores. Values recovered exactly is the proportion of source values narrowed to
 a single point by the reconstruction procedure of Section 2.11.*

@@ -332,7 +332,66 @@ already at six items against a cap of seven.
       over 566 records, 2.66 s for a full 25-fold utility evaluation. They belong
       in Results section 8 rather than Methods, per the template.
 
-## Stage 7. Verification
+## Stage 7. Verification. PARTLY DONE
+
+Both sections were audited against `proposal/MethodsSection/MARKING SCHEME_METHOD
+SECTION.pdf`, which is a harder document than the templates: pass is 90% and it
+states that no draft below 90% may go to the supervisor.
+
+### What the audit forced
+
+The first draft **failed Part A** on item A8, title and objectives not matching
+the F/M/R/S operation described in Section 8. The title was a question and named
+no operation. That settled a decision held open since Stage 2: under this scheme
+the proposed title and the two-objective structure are not optional, they are
+required to pass the gate. Both are now adopted.
+
+Seven further items were missing and are now supplied:
+
+| Rubric item | Was | Now |
+|---|---|---|
+| A6 public dataset provenance | citation only | source URL, retrieval date, licence, DOI |
+| 3 fusion strategy | "no fusion applied" | cross-validation replication, named against the four-type taxonomy and justified |
+| 4 ethics path | unstated | Path A named, with the Declaration of Helsinki and Act 843 |
+| 5 preprocessing | qualitative | missingness as exact percentages, class ratios as numbers |
+| 6 feature engineering | features named | Table 1 feature dictionary with the formula for all eight |
+| 9 training configuration | prose | Table 2, every parameter itemised |
+| 11 evaluation metrics | prose | Table 3, every metric with its one-line justification |
+| 13 ablation | described | point-change stated numerically, 0.129 to 0.875 |
+| 16 supervisor checklist | absent | Section 2.16, with the one unmet item stated rather than ticked |
+| G4 citations | 1 | 12, inside the 10 to 14 target |
+
+### Current state
+
+| Gate | Methods | Results |
+|---|---|---|
+| Part A | PASS | n/a |
+| G1 tense and voice | PASS | PASS |
+| G2 placeholders | **FAIL, caps at 70%** | PASS |
+| G3 length | 2,729 (deduction over 2,800) | 1,641, in range |
+| G4 citations | 12, in range | 4, in range |
+| Required items | all present | 6 of a 5 to 7 cap |
+| No discussion in Results | n/a | PASS |
+
+### The one thing blocking a pass
+
+The ethics reference reads `CHRPE/AP/XXX/26`. Any unfilled placeholder caps the
+score at 70% under G2, and the threshold is 90%. Nothing else in either section
+now caps the score.
+
+The placeholder is deliberately in the committee's own reference format so its
+shape is right when the real number arrives, and it is flagged three times: in
+the draft-status note at the head of the section, in Section 2.4 itself, and as
+the single unmet row in the Section 2.16 self-audit. It is stated rather than
+ticked there, because a self-audit that claims an item it does not satisfy is
+worth less than one that admits the gap.
+
+- [ ] Replace `CHRPE/AP/XXX/26` with the issued reference. This is the highest
+      value action available and is the only remaining cap.
+- [ ] Optional: trim Methods from 2,729 toward the 2,200 safe range. No deduction
+      applies below 2,800, so this is polish rather than a requirement.
+
+## Stage 7. Original template checklists
 
 Both templates end in a supervisor checklist. Run them literally before showing
 anyone.
