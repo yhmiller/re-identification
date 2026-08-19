@@ -398,20 +398,24 @@ def figure_explanation():
         PROPOSED,
     )
 
+    # Two-line caption. The vertical gap is wider than it looks it needs to be
+    # because the second block is itself two lines; at 1.6 and 1.0 they collided.
     ax.text(
         5.0,
-        1.6,
+        1.7,
         "The same pathway carries both the disclosure risk and the analytical value.",
         ha="center",
+        va="center",
         fontsize=9.5,
         color="#22262A",
     )
     ax.text(
         5.0,
-        1.0,
+        0.75,
         "Results are consistent with derived features computed from unprotected values\n"
         "acting as an information pathway that substantially reverses the effect of generalisation.",
         ha="center",
+        va="center",
         fontsize=8.2,
         color="#6B7075",
         linespacing=1.5,
