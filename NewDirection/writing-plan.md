@@ -164,13 +164,24 @@ Methods additionally needs Figure 1 (architecture), Figure 3 (baseline against
 proposed, the one modification marked) and Algorithm 1. Table 1 describes the
 corpora; Table 2 carries the confirmatory results.
 
-- [x] Per-fold scores retained, so Figure C is possible
-- [ ] `figures.py`, one function per figure, 300 dpi, no seaborn defaults
-- [ ] Baseline dashed blue-grey, proposed solid green, value labels on points,
-      captions below the figure and never inside the image
-- [ ] Figure C must show the allied health spread rather than only the means.
-      A figure that hides the one non-significant corpus would be the kind of
-      selective presentation this project has avoided so far
+- [x] Per-fold scores retained, and written to
+      `results/disclosure/confirmatory_fold_differences.csv`, 225 rows
+- [x] `figures.py`, one function per figure, 300 dpi PNG and PDF, no seaborn
+- [x] Baseline blue-grey, proposed green, values labelled on the marks, no
+      caption inside any image
+- [x] Figure C shows every fold as a jittered point over the box, and colours
+      the three allied health distributions differently because they straddle
+      zero. The corpus that does not support the claim is the most visible thing
+      in the figure
+
+Figures are written to `results/disclosure/figures/`, which is gitignored along
+with the rest of `results/`. `figures.py` is tracked, so any figure is one
+command away and no stale image can drift out of step with the tables.
+
+- [ ] Methods still needs Figure 1 (architecture), Figure 3 (baseline against
+      proposed with the modification marked) and Algorithm 1. All three are
+      diagrams of the procedure rather than plots of results, so they are drawn
+      when Methods is drafted
 
 ### One caution for the figures
 

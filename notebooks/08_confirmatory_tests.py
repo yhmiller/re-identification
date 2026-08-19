@@ -88,6 +88,10 @@ def utility_comparison(stratum, band_width):
         folds[dc.BASELINE]["fold_auc_pr"],
         n_splits=ru.N_CV_FOLDS,
     )
+    result["fold_differences"] = list(
+        np.asarray(folds[dc.PROPOSED]["fold_auc_pr"])
+        - np.asarray(folds[dc.BASELINE]["fold_auc_pr"])
+    )
     result["auc_pr_baseline"] = folds[dc.BASELINE]["auc_pr"]
     result["auc_pr_proposed"] = folds[dc.PROPOSED]["auc_pr"]
     result["relative_loss"] = (
@@ -138,11 +142,23 @@ def main():
                 f"SE x{u['se_inflation']:.2f}"
             )
 
+    # Per-fold differences go to their own long-format table. The stability
+    # figure needs the distribution rather than the summary: a figure showing
+    # only means would hide the corpus whose folds straddle zero.
+    fold_rows = [
+        {"stratum": u["stratum"], "band_width": u["band_width"],
+         "fold": i, "difference": d}
+        for u in utility_rows for i, d in enumerate(u["fold_differences"])
+    ]
+    pd.DataFrame(fold_rows).to_csv(
+        RESULTS / "confirmatory_fold_differences.csv", index=False
+    )
+
     for rows, filename in (
         (risk_rows, "confirmatory_risk.csv"),
         (utility_rows, "confirmatory_utility.csv"),
     ):
-        frame = pd.DataFrame(rows)
+        frame = pd.DataFrame(rows).drop(columns=["fold_differences"], errors="ignore")
         lead = ["stratum", "band_width"]
         frame = frame[lead + [c for c in frame.columns if c not in lead]]
         frame.to_csv(RESULTS / filename, index=False)
