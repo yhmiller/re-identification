@@ -36,7 +36,8 @@ Supervisor: Dr. Eric Opoku Osei
 Health training institutions share student academic records after deleting names
 and index numbers, and treat what remains as anonymous. It is not. A student's
 grade sequence is a fingerprint: in the allied health corpus, CGPA alone
-identifies 96.4% of students, and any two attributes identify all of them.
+identifies 96.4% of students, and ten of the 105 attribute pairs identify all
+of them.
 
 The study measures that residual risk, tests whether generalisation reduces it,
 and measures a transfer. That released statistics leak, and that a protected
@@ -85,8 +86,8 @@ or about Ghanaian institutions rests on it. See [strata.py](strata.py).
 |---|---|---|---|
 | Unique on full quasi-identifier set | 100.0% | 100.0% | 85.7% |
 | Unique on CGPA alone | 96.4% | 36.2% | n/a |
-| Attributes needed to reach 100% unique | 2 | 5 | 6 |
-| Uncertainty removed by baseline derivation | 100% | 98.7-100% | 67-89% |
+| Fewest attributes reaching 100% unique | 2 | 5 | not reached (67.8% at 6) |
+| Uncertainty removed by baseline derivation | 100% | 98.7-100% | 67-88% |
 | Source values narrowed to a point | 20.9-33.9% | 34.1-62.8% | 74.1-93.7% |
 | Utility restored by baseline derivation | 79-80% | 115-119% | 93-97% |
 | Utility cost of closing the leak (AUC-PR) | -0.027 | -0.135 | -0.067 |
@@ -99,8 +100,8 @@ and none of the three allied health configurations, where corrected p values are
 0.890, 0.361 and 0.854.
 
 The allied health null is a power result at 109 modelled records, not evidence of
-no cost. Its widest interval spans [-0.087, +0.033], consistent with a cost as
-large as any observed elsewhere and equally consistent with none. The same
+no cost. Its interval at band 0.50 reaches -0.087, admitting a cost larger than
+several observed elsewhere and equally admitting none. The same
 corpus proved too small for generalisation to protect at all, so one sample-size
 story appears twice.
 
@@ -117,8 +118,9 @@ population under a specified quasi-identifier configuration. They are an upper
 bound on risk, not a re-identification probability.
 
 Realisable risk is far below theoretical uniqueness. An attacker with plausible
-imprecise recall isolates at most 40% of allied health students, and under 6%
-once the sequence is banded.
+imprecise recall isolates at most 40% of allied health students. Banding does
+not reduce that figure, because the cumulative average is not among the
+generalised columns. It does cut the grade-recall scenarios, from 20.9% to 5.5%.
 
 Full record: [docs/disclosure-risk-findings.md](docs/disclosure-risk-findings.md).
 

@@ -218,7 +218,7 @@ risk is attributable to the derivation source and nothing else.
   derived features at original precision. This is what pipelines do today.
 - **Proposed.** Recomputes the derived features from the bands.
 - **Ablation.** Revert the derivation step. Protection collapses by 98.7% to
-  100% across the study population, and by 67% to 89% on the replication corpus.
+  100% across the study population, and by 67% to 88% on the replication corpus.
 
 The claim is transfer, not novelty, and the scoping search in `docs/literature/`
 settled that. Released statistics leak (Dinur and Nissim, 2003) and derivation
