@@ -49,8 +49,8 @@ measured rather than assumed away.
 > never returned. Nothing was deleted. This repository was cloned from the
 > earlier one, so the whole history came across: the pre-pivot codebase is at
 > the tag `scope/licensure-prediction`, and the outcome tooling is at
-> `f00df56:archive/licensure-outcome/`. Recover any of it with
-> `git show <commit>:<path>`.
+> the tag `licensure-archive`. Recover any of it with
+> `git show licensure-archive:archive/licensure-outcome/README.md`.
 
 ---
 

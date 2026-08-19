@@ -28,9 +28,9 @@ Nothing from the earlier scope was deleted. This repository is a clone of the
 one that held it, so the history came across intact. The pre-pivot codebase is
 at the tag `scope/licensure-prediction`. The outcome-simulation tooling, with
 a README explaining what each file was for, is at
-`f00df56:archive/licensure-outcome/`. Read any of it with
-`git show f00df56:archive/licensure-outcome/README.md`, or recover the whole
-directory with `git checkout f00df56 -- archive/`.
+the tag `licensure-archive`. Read any of it with
+`git show licensure-archive:archive/licensure-outcome/README.md`, or recover
+the whole directory with `git checkout licensure-archive -- archive/`.
 
 ---
 
