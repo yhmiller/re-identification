@@ -30,20 +30,51 @@ exploratory analysis cannot be.
 | Secondary privacy outcomes | Prosecutor risk; minimum equivalence class size; l-diversity; uncertainty reduction; exact recovery; attack success rate |
 | Primary utility outcome | AUC-PR, reported against its no-skill floor (the prevalence) |
 | Secondary utility outcome | AUC-ROC, reported against 0.500 |
-| Risk comparison | Paired bootstrap over records, 2000 resamples, baseline against proposed derivation |
-| Risk test statistic | Difference in proportion unique, with a 95% percentile confidence interval |
-| Risk effect size | Cliff's delta on the paired resample differences |
-| Utility comparison, primary | Paired difference in per-fold AUC-PR, baseline against proposed |
-| Utility comparison, secondary | Two one-sided tests against margin delta, same pairs |
-| Fold-correlation handling | Variance correction for repeated cross-validation. Naive paired tests are anti-conservative because folds share data |
-| Utility fold design | Five folds repeated across five seeds, 25 paired observations |
-| Equivalence margin | delta = 0.02 AUC-PR, absolute. See justification below |
-| Margin sensitivity | Conclusion re-reported across delta in 0.01 to 0.10, step 0.01 |
+| Risk comparison | Subsampling without replacement over records, 80% fraction, 2000 resamples |
+| Risk statistic | Difference in proportion unique, with a 95% percentile confidence interval |
+| Utility comparison | Paired difference in per-fold AUC-PR, baseline against proposed |
+| Utility fold design | Five folds repeated across five seeds, 25 paired observations, identical splits in both arms |
+| Fold dependence | Reported twice: naive, and with a variance correction for resampling-induced dependence. Adviser to confirm the correction suits this design |
+| Effect size | The raw difference in each metric's own units. Not standardised, see below |
+| Equivalence testing | Removed. See below |
+| delta | Removed from hypothesis testing. Retained only as an illustrative input to the decision framework |
 | Confidence level | 95% throughout |
 | Alpha | 0.05, one-sided per TOST component |
 | Multiple comparisons | Holm correction within each family. Families are defined below |
 | Corpora | Three, tested separately. Never pooled |
 | Random seeds | 42 for the fold splitter, 20260819 for the bootstrap |
+
+## Why equivalence testing was removed
+
+An equivalence test was specified while the arms were believed to perform
+identically. The corrected comparison shows differences of -0.027, -0.135 and
+-0.067, so an equivalence test at any defensible margin fails on every corpus. A
+test designed to fail conveys nothing the point estimate does not.
+
+The paired difference and its confidence interval are reported instead. That is
+strictly more informative: a reader who holds a different tolerance can apply it
+to the interval without needing the thesis to have guessed it.
+
+delta survives only in the decision framework, where a custodian supplies their
+own tolerance and reads off the configurations available to them. A value of 0.02
+appears in the worked example and is labelled illustrative. It is not a threshold
+the thesis tests against, so the question of when it was chosen no longer arises.
+
+## Why effect sizes are not standardised
+
+Both primary metrics are bounded and directly interpretable. A difference of
+0.135 AUC-PR, or of 84.1 percentage points of uniqueness, means something on its
+own.
+
+Standardising divides by a variance that repeated cross-validation makes
+ambiguous, which imports the dependence problem into the effect size without
+adding interpretability, and invites an argument about the choice of denominator
+that has no bearing on the finding. The raw difference in the metric's own units
+is an unstandardised effect size, which is the preferred form when the units are
+meaningful.
+
+Reported alongside each difference: the confidence interval, and the loss as a
+percentage of the baseline value.
 
 ## Hypotheses
 
@@ -68,16 +99,10 @@ analysis found differences of -0.027, -0.135 and -0.067 across the three corpora
 so the question is no longer whether the arms are equivalent but how large the
 cost is and whether it is larger than the variability of the procedure.
 
-**H2b, acceptability.** Secondary, and only meaningful per configuration. The
-utility cost falls within a margin a custodian would accept.
-
-    H2b_0a: difference <= -delta
-    H2b_0b: difference >=  delta
-
-Equivalence is concluded only if both one-sided nulls are rejected. Failing to
-reject a difference is not equivalence and is never reported as such. Under
-delta = 0.02 none of the three corpora is expected to pass, which is a result
-rather than a failure: it says the protection is not utility-neutral.
+**Acceptability is not tested.** Whether a given utility cost is worth a given
+risk reduction is a custodian's judgement about their own operational
+requirements, not a proposition about the data. The thesis supplies the frontier
+and the intervals; the choice belongs to whoever is releasing the file.
 
 **H2c, mechanism.** Exploratory and reported descriptively. The baseline
 derivation restores the analytical utility that generalisation removed.
@@ -96,8 +121,8 @@ different questions.
 
 | Family | Members |
 |---|---|
-| Risk, per corpus | One test per generalisation width, 3 widths |
-| Utility, per corpus | One TOST per generalisation width, 3 widths |
+| Risk, per corpus | One comparison per generalisation width, 3 widths |
+| Utility, per corpus | One comparison per generalisation width, 3 widths |
 
 Nine risk tests and nine utility tests in total across three corpora. Correction
 is applied within corpus and within family, so three members per correction.
@@ -127,44 +152,47 @@ rather than a feature, and it is identical across arms, so it cannot bias the
 comparison between them. It is noted because it is the only operation in the
 pipeline that uses information across records.
 
-## Justification of delta
+## delta in the decision framework
 
-The margin is a scientific assumption, not a statistical setting. It states how
-much utility loss is practically unimportant for this application, so it is
-justified from the application.
+delta is no longer a margin the thesis tests against. It is the tolerance a
+custodian brings to the frontier, and the framework reads configurations off
+against it.
 
-The utility task is early-warning screening: rank students by risk of weak
-final-semester performance so that support can be directed. A custodian receiving
-a protected release decides one thing, whether that release still supports the
-screening use.
+The worked example uses 0.02 AUC-PR, justified from the application: screening
+acts on a ranked list, and at cohort sizes of roughly one hundred to six hundred
+a difference of that size moves the composition of the flagged group by at most
+one or two students, below the granularity at which institutions allocate
+support. It is illustrative. A custodian with a different operational tolerance
+substitutes their own and the framework answers accordingly.
 
-Screening acts on a ranked list. What matters is whether the protected release
-puts materially different students near the top. At the cohort sizes this tool
-would be used on, from roughly one hundred to six hundred students, a difference
-of 0.02 AUC-PR moves the composition of the flagged group by at most one or two
-students. Institutions allocate tutoring and remediation in whole students and
-not in fractions of a ranking metric, so a difference below that threshold cannot
-be acted upon even if it is real.
+Because delta enters no hypothesis, when it was chosen no longer matters.
 
-Two grounds this justification deliberately does not use:
+## A resampling scheme rejected on evidence
 
-- The observed difference between the arms. That is approximately zero, which
-  makes the test easy to pass and would make a margin chosen on that basis
-  circular.
-- Convention. No established convention for AUC-PR equivalence margins in this
-  setting was found, and inventing one would be worse than arguing from the
-  application.
+The specification originally called for an ordinary bootstrap over records for
+the risk comparison. It was implemented, run, and rejected.
 
-**Sensitivity rather than assertion.** The conclusion is re-reported across delta
-from 0.01 to 0.10. The write-up states the range over which equivalence holds,
-which is a demonstrated claim, in place of asserting that no plausible margin
-would change it, which is not.
+Resampling with replacement duplicates records, and a duplicated record is no
+longer unique, so measured uniqueness falls under resampling. The fall is not
+symmetric between the arms: an arm at 87% uniqueness has far more to lose than
+one at 13%. The difference therefore shrinks toward zero, and on the nursing
+corpus the observed difference of -0.7456 fell outside a bootstrap interval of
+[-0.3074, -0.2367].
 
-**Fold-noise check.** If the observed standard deviation of AUC-PR across the 25
-folds exceeds 0.02 on any corpus, delta is raised to that standard deviation for
-that corpus and the change is reported. Claiming equivalence within a margin
-smaller than the noise of the measurement would be claiming a precision the
-design does not have.
+The check that caught this was written into the procedure in advance: the
+resample mean is compared against the observed value, and a discrepancy means
+the resampling scheme is measuring something other than the quantity of
+interest.
+
+Subsampling without replacement at 80% replaces it. No duplicates are created,
+both arms are evaluated on the same subsample, and the point estimate now sits
+inside its own interval: -0.7443 at the subsample against -0.7456 on the full
+corpus, interval [-0.7704, -0.7152].
+
+The cost is that uniqueness depends on set size, so intervals describe
+variability at 80% of each corpus. Both figures are reported wherever the
+interval appears, so any drift from the reduced size is visible rather than
+assumed away.
 
 ## Definitions fixed in advance
 
