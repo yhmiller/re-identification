@@ -119,7 +119,7 @@ Requires **Python 3.11**. The pinned libraries do not support 3.12 or later.
 
 ```bash
 brew install python@3.11          # macOS
-git clone <remote URL>
+git clone git@github.com:yhmiller/re-identification.git
 cd re-identification
 ./run.sh                          # builds ml_env on first use, then runs everything
 ```
