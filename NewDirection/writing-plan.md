@@ -90,9 +90,45 @@ differences, Wilcoxon signed-rank plus Cohen's d. Expect a very large effect.
 **Utility side, an equivalence test.** The claim is that the two releases give
 identical model utility, which is a claim of no difference. A non-significant
 Wilcoxon does not establish that; absence of evidence is not evidence of absence.
-The correct instrument is **TOST**, two one-sided tests, against a
-pre-registered equivalence margin. Set the margin before running it, and justify
-it as the smallest AUC-PR difference that would change a custodian's decision.
+The correct instrument is **TOST**, two one-sided tests against an equivalence
+margin fixed in advance.
+
+### Fixing the equivalence margin, delta
+
+This is a decision, not something the data yields. Three candidates, with what
+each commits the study to:
+
+| delta (AUC-PR) | Reads as | Risk |
+|---|---|---|
+| 0.01 | Any difference beyond a hundredth of a point matters | Strictest. Hardest to pass, strongest claim if it passes |
+| **0.02** | A difference below two points is not actionable | **Recommended** |
+| 0.05 | Only a substantial difference matters | Easiest to pass, weakest claim, invites the objection that the margin was chosen to succeed |
+
+**Recommend delta = 0.02 AUC-PR, absolute.** The justification must come from the
+application rather than from the observed numbers: a custodian comparing release
+configurations is deciding whether a research use remains viable, and a
+two-point AUC-PR difference sits below the fold-to-fold variation of the
+measurement itself at these sample sizes. A difference smaller than the noise in
+its own measurement cannot be acted on. Confirm this against the observed fold
+standard deviation once per-fold scores are retained, and if the fold SD exceeds
+0.02, raise delta to match it rather than reporting an equivalence the design
+cannot detect.
+
+### An honesty note that belongs in the methods
+
+The frontier has already been run, so the point estimates are known. A margin
+fixed now is not blind, and the write-up must say so rather than describe it as
+pre-registered.
+
+The defence is that delta is justified on decision-relevance grounds that are
+independent of the observed difference, and that the observed difference is
+approximately zero, so no choice of margin in the plausible range changes the
+conclusion. Both facts should be stated. A reader who suspects the margin was
+reverse-engineered can check the first claim against the justification and the
+second against the reported estimates.
+
+- [ ] Fix delta with the supervisor and record the decision with its date.
+- [ ] Retain per-fold scores so the fold SD can be checked against delta.
 
 This distinction is worth a sentence in the Methods. An examiner who knows
 statistics will ask how equivalence was established, and "p was not significant"

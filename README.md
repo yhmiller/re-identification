@@ -3,10 +3,11 @@
 Do the features a machine learning pipeline derives from student grades undo the
 de-identification applied to those grades?
 
-They do. Publishing derived features at original precision alongside generalised
-source variables destroys **98.7% to 100%** of the protection the generalisation
-provided, while giving **identical** model utility to recomputing them from the
-protected values. The leaky release is not a trade-off. It is a dominated choice.
+Measurably, yes. Publishing derived features at original precision alongside
+generalised source variables removes **98.7% to 100%** of the uncertainty the
+generalisation introduced, while giving **identical** model utility to
+recomputing them from the protected values. On those two axes the baseline
+release is dominated rather than a trade-off.
 
 Prince Bortey Miller | 22388461 | MSc Health Informatics, KNUST, 2026
 Supervisor: Dr. Eric Opoku Osei
@@ -20,9 +21,10 @@ and index numbers, and treat what remains as anonymous. It is not. A student's
 grade sequence is a fingerprint: in the allied health corpus, CGPA alone
 identifies 96.4% of students, and any two attributes identify all of them.
 
-The study measures that risk, tests whether generalisation fixes it, and finds a
-failure mode nobody has measured: the engineered features that pipelines publish
-alongside the protected data hand back the values the protection removed.
+The study measures that residual risk, tests whether generalisation reduces it,
+and examines a mechanism that has received limited empirical attention: features
+computed from source variables before those variables are generalised continue to
+disclose information about them afterwards.
 
 The engineered contribution is **derivation-consistent generalisation**. One
 modification: derived features are recomputed from the protected values rather
@@ -61,12 +63,16 @@ or about Ghanaian institutions rests on it. See [strata.py](strata.py).
 | Unique on full quasi-identifier set | 100.0% | 100.0% | 85.7% |
 | Unique on CGPA alone | 96.4% | 36.2% | n/a |
 | Attributes needed to reach 100% unique | 2 | 5 | 6 |
-| Protection reversed by leaky derived features | 100% | 98.7-100% | 67-89% |
-| Grade values recovered exactly from bands | 20.9-33.9% | 34.1-62.8% | 74.1-93.7% |
+| Uncertainty removed by baseline derivation | 100% | 98.7-100% | 67-89% |
+| Source values narrowed to a point | 20.9-33.9% | 34.1-62.8% | 74.1-93.7% |
 
 Group size protects: Spearman **-0.893** across 11 groups of the study
 population spanning 5 to 238 students, **-0.880** across all 13 groups spanning
 5 to 423.
+
+Uniqueness figures describe records within each defined institutional
+population under a specified quasi-identifier configuration. They are an upper
+bound on risk, not a re-identification probability.
 
 Realisable risk is far below theoretical uniqueness. An attacker with plausible
 imprecise recall isolates at most 40% of allied health students, and under 6%

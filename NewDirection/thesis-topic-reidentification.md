@@ -1,7 +1,7 @@
 # Thesis topic: re-identification risk in health professions education records
 
 Programme: MSc Health Informatics
-Status: proposal-ready draft
+Status: proposal draft, revised 19 August 2026 against external review
 Compiled: 16 August 2026
 
 ## Title
@@ -12,69 +12,143 @@ Re-identification Risk in Ghanaian Health Professions Education Records: Do Deri
 
 **Proposed, not yet adopted:**
 
-Derivation-Consistent Anonymisation for Re-identification Risk in Health Professions Education Records Using Hybrid Public and Institutional Academic Data
+Derivation-Consistent De-identification of Health Professions Education Records: Disclosure Risk and Analytical Utility Under Hybrid Public and Institutional Academic Data
 
 The proposed title follows the Q1 methods template formula, which requires the
 manuscript to name one engineered artefact rather than a question, and to signal
 hybrid public plus field data. Switching to it commits the study to the single
-engineering operation described in `NewDirection/writing-plan.md`. Do not adopt
-it until that framing is agreed, because the title, the objectives and Section 8
-of the methods must match or the manuscript is desk-rejected on the mismatch.
+engineering operation implemented in `derivation_consistent.py`. Do not adopt it
+until that framing is agreed, because the title, the objectives and Section 8 of
+the methods must match or the manuscript is desk-rejected on the mismatch.
 
-Short title: Re-identification risk in Ghanaian nursing education records
+An earlier draft of this title said "Anonymisation". That word is now avoided
+throughout. The study measures *residual* re-identification risk, and the
+proposed method reduces that risk without eliminating it. Calling the output
+anonymous invites the question "anonymous in what sense", which is a terminology
+argument that distracts from the contribution. The code uses
+"derivation-consistent generalisation"; the title uses "de-identification" as the
+broader operation; neither claims anonymity.
+
+Short title: Derivation-consistent de-identification of academic records
 
 ## Summary
 
-Health training institutions share student academic records with researchers, accreditation bodies and regulators after "anonymising" them by deleting names and identity numbers. This is not anonymisation. Academic records hold combinations of attributes such as programme, cohort year and a sequence of semester grades that remain unique to individuals after every direct identifier has been removed.
+Health training institutions share student academic records with researchers,
+accreditation bodies and regulators after removing names and identity numbers.
+Removing direct identifiers does not by itself make a dataset anonymous:
+residual risk depends on which attributes remain, what an adversary already
+knows, and what the release can be linked to. Academic records retain
+combinations such as programme, cohort year and a sequence of semester grades
+that remain unique to individuals after every direct identifier is gone.
 
-This study measures that risk on a real Ghanaian nursing student dataset. It then tests a failure mode that has not been examined anywhere: whether the engineered features machine learning practitioners derive from academic records undo the de-identification applied to the source data. The study closes by deriving a risk-utility frontier and proposing an operational de-identification standard that health training institutions can apply.
+This study measures that residual risk, then examines a specific mechanism that
+has received limited empirical attention: whether features derived from source
+variables *before* those variables are generalised continue to disclose
+information about them afterwards. It evaluates a derivation-consistent
+alternative, in which the same features are recomputed from the generalised
+values, and reports the disclosure risk and analytical utility of both.
+
+## The proposition, in one paragraph
+
+Generalisation can protect source variables while features calculated from the
+original values continue to disclose information about those variables. This
+study quantifies that leakage in health professions education records and
+evaluates whether recomputing the derived features from the generalised values
+reduces disclosure risk without materially reducing analytical utility.
+
+Everything below serves that sentence. Where an earlier draft made the Ghanaian
+risk estimates the novelty, they are now the empirical setting. Where it promised
+a national standard, it now offers a proposed operational framework.
 
 ## 1. Background and problem statement
 
-Ghana's health training institutions hold detailed academic records for every nursing, midwifery and allied health student they train. Those records are shared more often now than in the past: for institutional research, for accreditation, for workforce planning and lately for machine learning projects that predict academic and licensure outcomes.
+Ghana's health training institutions hold detailed academic records for every
+nursing, midwifery and allied health student they train. Those records are shared
+for institutional research, for accreditation, for workforce planning and lately
+for machine learning projects.
 
-The prevailing protection is direct identifier removal. Delete the name, delete the index number, treat what remains as anonymous. That practice has been known to be inadequate for more than two decades. Foundational work in health data showed that most of a population can be uniquely identified from a small number of ordinary attributes. The same work showed that an "anonymised" medical dataset could be re-identified by linking it to a publicly available list.
+The prevailing protection is direct identifier removal. Delete the name, delete
+the index number, treat what remains as protected. That practice has been known
+to be inadequate for more than two decades: re-identification risk depends on the
+attributes that remain and on what an adversary can link them to, not on whether
+a name column is present.
 
-Academic records may be more exposed than the demographic data those demonstrations used. A student's six-semester grade sequence works as a fingerprint. The probability that two students at one institution share the same six semester GPAs is negligible. Programme and cohort year narrow the field before the grades are consulted at all. An adversary needs very little side knowledge, the kind a classmate, lecturer or prospective employer would ordinarily hold, to isolate a single record and read everything else in it.
+Academic records are well suited to this failure. A student's grade sequence
+functions as a fingerprint, and programme and cohort year narrow the field before
+the grades are consulted. An adversary needs modest side knowledge, of the kind a
+classmate or lecturer would ordinarily hold, to reduce the candidate set sharply.
 
-What makes this a health informatics problem rather than an education problem is what the records attach to. Health professions student data links to licensure outcomes, to fitness-to-practise information and to health workforce registries. The sensitive attribute at the end of that chain, whether a person passed their professional licensure examination, is career-determining. In a small professional community it is socially consequential as well.
+What makes this a health informatics problem rather than an education problem is
+what the records attach to. Health professions student data links to licensure
+outcomes, to fitness-to-practise information and to workforce registries. The
+attribute at the end of that chain, whether a person passed their professional
+licensure examination, is career-determining and, in a small professional
+community, socially consequential.
 
-Ghana's Data Protection Act, 2012 (Act 843) governs this processing. No operational standard tells a Ghanaian health training institution what adequate de-identification looks like. Institutions are left applying a rule of thumb that the technical literature abandoned two decades ago.
+Ghana's Data Protection Act, 2012 (Act 843) governs this processing, and the Data
+Protection Commission frames personal data broadly enough to include individuals
+recognisable indirectly through their characteristics. Whether Ghanaian health
+training institutions have operational de-identification guidance is a question
+this study does not attempt to answer, because answering it properly would
+require a review of institutional and regulatory guidance that is outside its
+scope. The study reports what the records disclose and what a specific procedure
+does about it, and leaves the regulatory gap analysis to work equipped to do it.
 
 ## 2. Research gap
 
-Three gaps converge here. The third is the novel one.
+Two things are established and one is not.
 
-The first is that no measured risk exists for Ghanaian health data. Re-identification risk has been quantified extensively for North American and European health datasets. It has not been quantified for Ghanaian health data of any kind. No evidence-based de-identification standard exists for Ghanaian health institutions.
+**Established.** Removing identifiers does not produce anonymity, and residual
+risk is measurable. Health data privacy research has developed the metrics, the
+adversary models and the risk-utility framing this study uses.
 
-The second is that health professions education records are unexamined. Disclosure control research concentrates on clinical records, administrative health data and survey microdata. Student academic records in health training institutions fall outside the clinical privacy literature. They fall outside the learning analytics ethics literature too, which is largely normative rather than quantitative.
+**Established.** Information that looks non-identifying can still disclose after
+anonymisation, and derived or transformed representations can leak about their
+sources. The general concern is not new.
 
-The third is that derived features are treated as harmless. Machine learning on academic records nearly always involves feature engineering: trends, minima, maxima, consistency measures, counts of weak periods. Two assumptions are made implicitly and neither has been tested. The first is that releasing only derived summary features, rather than raw records, protects privacy. The second is that de-identification applied to source variables also protects the variables computed from them.
+**Not established.** What has received limited empirical attention is the
+specific combination this study addresses: features derived from source variables
+at their original precision, released alongside a generalised version of those
+same variables, in a setting where the derived features are exactly the ones a
+machine learning pipeline produces. Two assumptions are commonly made and neither
+is well evidenced. The first is that releasing only derived summaries, rather
+than records, is protective. The second is that generalisation applied to a
+source variable also protects variables computed from it.
 
-Both assumptions are questionable. A derived feature computed at full precision from a generalised source variable can reveal the original value, so the derived feature reverses the protection. Any health data science team can fall into this. No published work quantifies it.
+This framing is deliberately narrower than an earlier draft, which asserted that
+the failure mode "has not been examined anywhere" and that "no published work
+quantifies it". Those claims are not defensible without a systematic search, and
+a single counter-example would sink them. The claim now made is about limited
+evidence for a specific combination of setting, operation and attack, which is
+what the study can actually support.
+
+A systematic literature search is required before submission, and its result may
+narrow this claim further. That is expected rather than a risk.
 
 ## 3. Aim and objectives
 
 **Current, in use.**
 
-Aim: to quantify re-identification risk in Ghanaian health professions education records, establish whether derived features undermine de-identification of the source data and produce an evidence-based de-identification standard that preserves analytical utility.
+Aim: to quantify residual re-identification risk in Ghanaian health professions
+education records, establish whether derived features undermine generalisation
+applied to their source variables, and evaluate a derivation-consistent
+alternative in terms of disclosure risk and analytical utility.
 
 Objectives:
 
-1. Measure baseline disclosure risk in a real Ghanaian nursing student dataset under recognised risk metrics and adversary models.
+1. Measure baseline disclosure risk under recognised risk metrics and adversary models.
 2. Attribute that risk to specific attributes and attribute combinations.
-3. Establish whether derived academic features form an independent disclosure channel and whether they defeat generalisation applied to their source variables.
-4. Validate the theoretical risk through a simulated linkage attack under realistic side-knowledge assumptions.
-5. Optimise de-identification to maximise retained analytical utility subject to a defined risk ceiling and characterise the resulting risk-utility frontier.
-6. Turn the findings into an operational de-identification standard for Ghanaian health training institutions.
+3. Establish whether derived academic features form an independent disclosure channel, and whether they narrow the uncertainty that generalisation introduces into their source variables.
+4. Validate measured risk against a simulated linkage attack under justified side-knowledge scenarios.
+5. Characterise the risk-utility frontier across release configurations.
+6. Propose an operational framework that institutions could use, and that could inform future guidance.
 
 **Proposed, not yet adopted.**
 
-The Q1 methods template caps a manuscript at three objectives and states that two
-is best. Each must map onto a specific methods subsection, and each must name the
-single engineering operation the title names. Six objectives describe a study;
-two describe a contribution. Adopt these only alongside the proposed title, since
-title, objectives and Methods section 8 must all name the same operation.
+The Q1 methods template caps a manuscript at three objectives and prefers two.
+Each must map onto a specific methods subsection and name the single engineering
+operation the title names. Adopt these only alongside the proposed title, since
+title, objectives and Methods section 8 must all agree.
 
 1. To develop a derivation-consistent generalisation procedure for student
    academic records, in which features derived from a generalised variable are
@@ -85,200 +159,362 @@ title, objectives and Methods section 8 must all name the same operation.
 
 The six above are not discarded. Objectives 1, 2 and 4 become results reported
 under proposed objective 2; objective 3 becomes the ablation; objective 5 becomes
-the risk-utility frontier; objective 6 becomes the practical contribution in the
+the risk-utility frontier; objective 6 becomes the practical implication in the
 discussion.
 
-## 4. Research questions
+## 4. Outcomes, ranked
 
-RQ1. What proportion of records in a Ghanaian health professions education dataset are uniquely identifiable on quasi-identifiers alone? What is the disclosure risk under the prosecutor, journalist and marketer adversary models?
+An earlier draft listed a dozen measures without saying which one the thesis
+turns on. An examiner asking "what is the primary outcome" needs one answer.
 
-RQ2. Which attributes and attribute combinations drive that risk? How few attributes does an adversary need to isolate an individual?
+**Primary outcome.** Disclosure risk under a predefined adversary model,
+expressed as the proportion of records uniquely identifiable on a specified
+quasi-identifier configuration, with prosecutor risk reported alongside.
 
-RQ3. Do derived academic features such as trend, consistency, minima, maxima and weak-period counts form an independent re-identification channel when released without the raw grade sequence?
+**Secondary outcomes.**
 
-RQ4. Does releasing derived features at full precision defeat generalisation applied to their source variables? Can the original values be reconstructed?
+1. Equivalence class structure: k-anonymity level, class size distribution, l-diversity, t-closeness.
+2. Leakage from derived features: reduction in the uncertainty that generalisation introduces, and the proportion of source values narrowed to a point.
+3. Attack success: proportion of targets isolated under justified side-knowledge scenarios.
+4. Analytical utility: predictive performance retained on the protected release.
 
-RQ5. What generalisation and suppression configuration maximises retained analytical utility subject to a defined risk ceiling? What shape does the risk-utility trade-off take?
+Everything else is diagnostic and belongs in supplementary material.
 
-RQ6. What operational de-identification standard follows from the results? How does it compare with existing international standards?
+## 5. Research questions
 
-## 5. Conceptual framework
+RQ1. What proportion of records is uniquely identifiable on quasi-identifiers alone, and what is the disclosure risk under the prosecutor, journalist and marketer models?
+
+RQ2. Which attributes drive that risk, and how few does an adversary need?
+
+RQ3. Do derived academic features form an independent disclosure channel when released without the source sequence?
+
+RQ4. Does releasing derived features at original precision alongside generalised source variables reduce the uncertainty the generalisation introduced, and by how much?
+
+RQ5. How does risk trade against analytical utility across release configurations, and which configurations are not dominated?
+
+RQ6. What operational framework follows, and how does it compare with published de-identification guidance?
+
+## 6. Conceptual framework
 
 Three disclosure types are measured separately.
 
 | Type | Definition | Relevance here |
 |---|---|---|
-| Identity disclosure | An adversary matches a record to a specific individual | The core risk, since grade sequences are near-unique |
-| Attribute disclosure | An adversary learns a sensitive value about an individual without necessarily isolating their record | Applies where a whole programme-cohort group shares an outcome |
+| Identity disclosure | An adversary matches a record to a specific individual | The primary outcome |
+| Attribute disclosure | An adversary learns a sensitive value without necessarily isolating a record | Applies where a whole group shares an outcome |
 | Membership disclosure | An adversary learns that an individual appears in the dataset | Relevant where inclusion is itself sensitive |
 
-Three adversary models yield three different risk figures from the same data. The prosecutor knows the target is in the dataset, so risk sits at its maximum and is driven by the smallest equivalence class. The journalist does not know who is in the dataset but wants to re-identify anyone, so risk turns on uniqueness in the wider population. The marketer wants many re-identifications and tolerates errors, so risk is averaged across records.
+Three adversary models yield three risk figures from the same data. The
+prosecutor knows the target is in the dataset, so risk is driven by the smallest
+equivalence class. The journalist does not know who is in the dataset, so risk
+turns on uniqueness scaled by the sampling fraction. The marketer wants many
+re-identifications and tolerates errors, so risk is averaged across records.
 
-One methodological point deserves stating early. Most re-identification studies work on a sample and must estimate population uniqueness from sample uniqueness, which introduces a sampling-fraction assumption that weakens their conclusions. If the dataset used here covers all students in the relevant cohorts at the institution, then the population is the dataset, the sampling fraction is one and sample uniqueness equals population uniqueness exactly. The risk figures are measured rather than estimated. That is a stronger position than most published work in this area occupies.
+### Uniqueness is not re-identification probability
 
-## 6. Data
+These are related and not the same, and conflating them is the easiest way to
+overstate a result. Uniqueness says a record has no twin on a given attribute
+set. Re-identification requires an adversary who holds those attribute values,
+holds them accurately, and knows the target is present.
 
-Source: student academic records from a Ghanaian health training institution, already obtained and processed under an existing data-sharing arrangement. No new data collection is required.
+The study measures both, and they diverge sharply. In the allied health corpus
+every record is unique on the full quasi-identifier set, while an adversary with
+plausible imprecise recall isolates at most 40% of targets, and under 6% once the
+sequence is generalised. Uniqueness is an upper bound; measured attack success is
+a lower bound, since a real adversary may hold more than the simulation grants.
+Both are reported, and neither is presented as the risk.
 
-Unit of analysis: the individual student record.
+### What the sampling fraction claim does and does not license
 
-Variables available, per schema.py:
+Each corpus covers every student in its cohorts, so within that defined
+population sample uniqueness equals population uniqueness and no estimation step
+is needed. This is a genuine strength relative to studies that must infer
+population uniqueness from a sample.
 
-| Group | Fields |
-|---|---|
-| Context and direct | student_id, cohort_year, programme |
-| Aggregate performance | cgpa, total_credits, n_courses |
-| Semester sequence | gpa_sem1 to gpa_sem6 |
-| Grade distribution | n_grade_A to n_grade_E |
-| Derived features | gpa_min, gpa_max, gpa_consistency, gpa_trend, gpa_first_half, gpa_final_half, n_weak_semesters, n_failed, fail_rate |
+It licenses statements of the form: *this proportion of records was unique within
+the defined institutional population under the specified quasi-identifier
+configuration*. It does not license statements about Ghanaian students in
+general, about other institutions, or about the probability that a particular
+student can be identified by a particular adversary. Results are worded
+accordingly throughout.
 
-Candidate quasi-identifier set: programme, cohort_year, gpa_sem1 to gpa_sem6, cgpa, n_courses, total_credits and the grade counts. Sensitivity analysis will test alternative quasi-identifier definitions, since that choice materially affects measured risk.
+## 7. Data
 
-Sensitive attribute: academic failure indicators derivable from the record. The licensure outcome is not required. There is no dependent variable in this study, so it does not depend on any outstanding data request.
+Three corpora, never pooled. Full specifications in `strata.py`.
 
-## 7. Methodology
+| | Role | n | Source |
+|---|---|---|---|
+| `allied_health` | study population | 110 | Accra School of Hygiene, EH/OHS/OT, 2021-2022 |
+| `nursing` | study population | 566 | BSc Nursing, 2023/24 and 2024/25, levels 200-400 |
+| `public` | replication corpus | 649 | UCI Student Performance (Cortez & Silva, 2008) |
 
-### Phase 0. Governance (weeks 1 to 2)
+The public corpus is not part of the study population. It is Portuguese secondary
+school students in a language course, present to test whether the mechanism
+reproduces outside the study population and for no other purpose. No claim about
+health records, Ghanaian institutions or Act 843 rests on it.
 
-Confirm in writing that the existing data-sharing arrangement covers secondary use for this research question. Obtain institutional ethics approval. Agree a responsible disclosure route with the institution so that findings reach them before publication.
+Unit of analysis: the individual student record. No new data collection.
 
-### Phase 1. Baseline risk measurement (weeks 3 to 5)
+Sensitive attribute: weak performance in the final observed sequence position,
+defined per corpus at the bottom 40%. The licensure outcome is not required.
+There is no dependent variable, so the study does not depend on any outstanding
+data request.
 
-Compute the following over the candidate quasi-identifier set: the proportion of records that are unique; the distribution of equivalence class sizes; the k-anonymity level achieved together with the share of records at k below 3 and k below 5; l-diversity and t-closeness with respect to the sensitive attribute; prosecutor, journalist and marketer risk.
+## 8. Method
 
-Repeat across alternative quasi-identifier definitions and across precision levels for the continuous variables.
+### Phase 1. Baseline risk
 
-### Phase 2. Risk attribution (weeks 5 to 7)
+Uniqueness, equivalence class size distribution, k-anonymity, share of records
+below k thresholds, l-diversity, t-closeness, and prosecutor, journalist and
+marketer risk, across alternative quasi-identifier definitions and precision
+levels.
 
-Find the minimum attribute set sufficient to isolate an individual by measuring uniqueness across all attribute subsets up to a tractable size. Rank attributes by marginal contribution to disclosure risk. The expected finding is that programme, cohort year and a small number of semester GPAs will suffice.
+### Phase 2. Attribution
 
-### Phase 3. The derived-feature experiments (weeks 7 to 10)
+Identifying power of each attribute alone, and a greedy accumulation curve
+showing how few attributes suffice. Leave-one-out attribution is not used:
+uniqueness saturates at two attributes, so removing any single member of a larger
+set changes nothing and every marginal contribution returns zero. Attribution is
+therefore measured from below.
 
-This phase carries the study's main contribution.
+### Phase 3. The derived-feature experiments
 
-Experiment A treats derived features as an independent channel. Measure uniqueness and k-anonymity on the derived feature set alone (gpa_trend, gpa_consistency, gpa_min, gpa_max, n_weak_semesters, fail_rate) with the raw semester sequence withheld. This tests the common assumption that releasing summaries rather than records protects privacy.
+The study's main contribution.
 
-Experiment B sets derived features against generalisation. Apply k-anonymisation to the raw semester GPAs by banding them into progressively coarser intervals, then release the derived features at full precision alongside them. Attempt to reconstruct the original raw values from the derived features. Since gpa_min and gpa_max are exact order statistics of the source vector, this tests directly whether derived features reverse the protection applied to their source.
+**Experiment A.** Measure uniqueness on the derived feature set alone, with the
+source sequence withheld. Tests whether a summary-only release is protective.
 
-Experiment C establishes consistent protection. Repeat Experiment B with the derived features recomputed from the generalised data rather than from the originals, then quantify the utility difference. This settles the correct operational procedure.
+**Experiment B.** Generalise the source sequence, publish the derived features at
+original precision alongside, and measure how far an adversary can narrow the
+generalised values using them.
 
-### Phase 4. Adversarial validation (weeks 10 to 12)
+The claim here is deliberately weaker than "reconstruct the originals". What the
+derived features do is *reduce the uncertainty that generalisation introduced*.
+`gpa_min` and `gpa_max` are exact order statistics, so releasing them discloses
+that at least one source value equals a stated number; each mean fixes a sum
+across the sequence. Together these constraints narrow the intervals the bands
+established, and in some cases collapse an interval to a point.
 
-Simulate a linkage attack under realistic side knowledge: the profile a classmate, lecturer or employer would plausibly hold, meaning programme, approximate cohort, one or two remembered grades and possibly a rank position. Measure attack success against theoretical risk to establish whether the calculated risk is realisable in practice.
+Two quantities are therefore reported, and the first leads:
 
-An ethical guardrail applies throughout this phase. Side knowledge is simulated from within the dataset. No attempt is made to identify any real, named individual at any point. No re-identified record is reported.
+- **Uncertainty reduction.** Mean interval width after the attack against the
+  band width before it. This is the honest primary measure.
+- **Exact recovery.** The proportion of source values narrowed to a single value.
+  A subset of the above, reported second.
 
-### Phase 5. Optimisation and the risk-utility frontier (weeks 12 to 16)
+A containment check confirms that the true value never falls outside the interval
+the attack produces. A soundness error would surface there immediately.
 
-Implement generalisation and suppression optimisation that maximises retained information subject to a risk constraint, using Mondrian partitioning with an integer programming formulation for comparison. Compare against a differential privacy alternative so that the study does not end up defending a single paradigm.
+**Experiment C.** Repeat with the derived features recomputed from the
+generalised values. Quantify what that costs.
 
-Utility is measured two ways. The information-theoretic measures are the discernibility metric, average equivalence class size and non-uniform entropy loss. The analytical measure is the existing XGBoost pipeline's predictive performance on protected data against original data. The second is the decisive one, because it answers the question a data custodian actually asks: would this de-identification break the research the data is shared for?
+### Phase 4. Adversarial validation
 
-Produce the frontier with risk on one axis and retained model performance on the other.
+Attack success under side knowledge, simulated from within each corpus and
+degraded to reflect imprecise recall. Every scenario is tied to a person who
+plausibly holds that knowledge, because an examiner will ask why an adversary
+would know a third-semester grade.
 
-### Phase 6. Standard and write-up (weeks 16 to 24)
+| Adversary | Plausibly knows | Source of that knowledge |
+|---|---|---|
+| Classmate | Programme, cohort, approximate performance in shared courses | Sat the same courses; results are often discussed or posted |
+| Lecturer or tutor | Programme, cohort, grades in courses they taught | Marked the work |
+| Employer or placement supervisor | Programme, approximate graduation year, broad standing | Application materials, references, transcripts submitted voluntarily |
+| Administrator at a second institution | Programme, cohort, transfer or verification records | Credential verification requests |
 
-Convert the frontier into a de-identification standard with worked examples and a decision procedure. Benchmark it against international comparators. Draft, revise, submit.
+Recall is degraded by a tolerance expressed as a fraction of the grade range,
+because nobody recalls that a classmate scored 2.87. Results are reported by
+scenario, so risk can be read as a function of how much the adversary knows
+rather than as a single number.
 
-## 8. Tools
+**Ethical guardrail.** Side knowledge is simulated from within the corpora. No
+attempt is made to identify any real, named individual at any point. No
+re-identified record is reported.
+
+### Phase 5. Risk-utility frontier
+
+Release configurations across generalisation width, suppression threshold and
+derivation mode. Risk is the primary outcome; utility is predictive performance
+under the settled fold design, reported against its no-skill floor. Configurations
+that are dominated on both axes are identified as such.
+
+### Phase 6. Framework and write-up
+
+Convert the frontier into a proposed operational framework with worked examples
+and a decision procedure, positioned as something that could inform institutional
+guidance rather than as a standard.
+
+## 9. Success criterion, prespecified
+
+Defined before results are examined, so the conclusion is not fitted to what was
+found.
+
+> The proposed procedure succeeds if it reduces the primary disclosure risk
+> outcome substantially relative to standard generalisation, while retaining
+> analytical utility within a prespecified equivalence margin.
+
+Risk reduction is tested with a paired bootstrap comparison, reporting the
+difference with a confidence interval and an effect size.
+
+Utility equivalence is tested with two one-sided tests against a margin **δ**,
+because a non-significant difference test does not establish equivalence. **δ
+must be fixed before the tests are run.** See `NewDirection/writing-plan.md` for
+the options and the recommendation; it is a decision for the supervisor, not a
+number to be discovered.
+
+## 10. Tools
+
+Reduced to what the study actually uses. An earlier draft listed five external
+anonymisation packages and two optimisation frameworks, most of which were never
+adopted. Listing tools that were not used is a reviewer invitation.
 
 | Purpose | Tool |
 |---|---|
-| Risk metrics and anonymisation | ARX Data Anonymization Tool; sdcMicro (R); pycanon (Python) |
-| Privacy attack evaluation | anonymeter; custom reconstruction attacks |
-| Differential privacy comparison | diffprivlib or OpenDP |
-| Utility measurement | Existing XGBoost pipeline (engineered_xgboost.py, baseline_xgboost.py) |
-| Optimisation | Mondrian implementation; PuLP for the ILP formulation |
+| Risk metrics, attribution, attacks, release construction | Own implementation, `disclosure_risk.py`, `deidentify.py`, `attack_models.py`, `derivation_consistent.py` |
+| Utility measurement | Existing XGBoost pipeline |
+| Statistics | `scipy`, paired bootstrap and TOST |
 
-## 9. Expected contribution
+Cross-validation of the risk metrics against an established package, most likely
+ARX or `sdcMicro`, is worth doing once to show the implementation agrees with a
+reference. That is a verification step, not a second methodology.
+
+**Deliberately out of scope.** Mondrian partitioning, integer programming for
+optimal generalisation, and a differential privacy arm. Each is defensible work
+and none is necessary for the proposition. If time is short, the derived-feature
+experiment is the thesis and these are the first things to drop. Differential
+privacy is discussed as a comparator paradigm rather than implemented, and the
+positioning is that this study addresses a different operational problem:
+consistent transformation of derived features inside a generalisation workflow.
+
+## 11. Expected contribution
 
 Academic:
 
-1. First quantified re-identification risk estimates for Ghanaian health data of any kind.
-2. First treatment of health professions education records as a disclosure control problem.
-3. Evidence on the derived-feature question: whether engineered features form an independent disclosure channel and whether they defeat generalisation of their source variables. This generalises well beyond education. Any health machine learning pipeline that derives features from protected variables faces the same exposure.
-4. Measured rather than estimated population uniqueness, which avoids the sampling-fraction assumption that weakens most comparable work.
+1. Quantified residual re-identification risk for a category of health data that
+   has attracted little attention, in a setting with no published estimates.
+2. An empirical treatment of derived-feature leakage under generalisation:
+   a controlled baseline-against-proposed comparison, quantified effect on
+   disclosure risk, tested against a simulated attack, with the utility cost
+   measured.
+3. Measured rather than estimated uniqueness within the defined population,
+   avoiding the sampling-fraction assumption most comparable work must make.
+4. Replication of the mechanism on an independent public corpus, separating what
+   is a property of the arithmetic from what is a property of the setting.
 
 Practical:
 
-1. An operational de-identification standard that Ghanaian health training institutions and their regulators could adopt.
-2. A quantified answer to the question a data custodian actually asks: how much can we protect this before it stops being useful?
-3. A procedural recommendation for health data science teams. Recompute derived features from protected data. Never release them alongside generalised sources at original precision.
+1. A proposed operational framework that institutions could adopt and that could
+   inform future guidance.
+2. A quantified answer to the question a custodian actually asks: how much can
+   this be protected before it stops being useful?
+3. A procedural recommendation: recompute derived features from protected data,
+   rather than releasing them alongside generalised sources at original
+   precision.
 
-## 10. Ethics and governance
+### On "isn't this obvious?"
 
-Institutional ethics approval is required before Phase 1 begins.
+The expected challenge, and worth rehearsing. The principle is intuitive once
+stated. The contribution is not the intuition but the work around it: formalising
+the operation, constructing a controlled comparison in which only the derivation
+source differs, quantifying the effect on disclosure risk, testing it against a
+simulated attack, measuring the utility cost, and showing the result holds across
+corpora with different scales and structures. Intuitions that nobody has measured
+are how pipelines end up publishing both columns.
 
-Written confirmation is needed that the existing data-sharing arrangement extends to this research question. Consent obtained for a licensure prediction study does not automatically cover a disclosure risk study. This must be settled explicitly rather than assumed.
+## 12. Ethics and governance
 
-No real individual is identified at any stage. Attacks use side knowledge simulated from within the dataset.
+Institutional ethics approval obtained; reference number to be recorded.
 
-Reported outputs are aggregate risk metrics only. No record-level results are published. No illustrative "example" re-identifications appear anywhere in the thesis.
+Written confirmation that the data-sharing arrangement covers secondary use for
+this research question. Consent for a licensure-prediction study does not
+automatically cover a disclosure-risk study.
 
-Responsible disclosure applies. Findings go to the institution before publication, with remediation guidance.
+No real individual is identified at any stage. Reported outputs are aggregate
+only. No record-level results, no illustrative example re-identifications.
 
-Data stays in its existing storage arrangement throughout. The study adds no new transfer or exposure.
+Responsible disclosure: findings reach the institutions before publication, with
+remediation guidance. Data stays in its existing storage arrangement; the study
+adds no new transfer or exposure.
 
-## 11. Scope and limitations
+## 13. Scope and limitations
 
-Single institution. Risk figures are specific to this dataset's size, programme mix and cohort structure. What transfers is the mechanism rather than the numbers.
+Risk estimates are specific to these corpora, their sizes and their cohort
+structures. What transfers is the mechanism, not the numbers.
 
-Side knowledge is assumed rather than observed. Real adversaries may hold more than the simulation grants them, so measured attack success is a lower bound on real risk.
+Uniqueness and re-identification probability are distinct. Uniqueness figures are
+upper bounds on risk; simulated attack success is a lower bound.
 
-k-anonymity and its extensions have known weaknesses. The differential privacy comparison in Phase 5 addresses this rather than ignoring it.
+Side knowledge is assumed rather than observed. The scenarios are justified but
+not validated against real adversary behaviour.
 
-Utility is measured against one modelling task. A de-identification setting that preserves XGBoost performance may not preserve performance for a different analysis. This is stated rather than glossed over.
+k-anonymity and its extensions have known weaknesses. Differential privacy is
+discussed rather than implemented, which is a deliberate scope decision and a
+limitation.
 
-No licensure outcome. The sensitive attribute is an academic proxy. That limits the attribute disclosure analysis specifically and is disclosed as such.
+Utility is measured against one modelling task. A configuration that preserves
+this model's performance may not preserve another analysis.
 
-## 12. Fit
+The sensitive attribute is an academic proxy, since no licensure outcome exists.
+That limits the attribute-disclosure analysis specifically.
 
-MSc Health Informatics. Health data privacy, disclosure control, secondary use of health data and data governance are core to the discipline. The study sits on the health informatics agenda rather than beside it.
+The regulatory gap is asserted only as far as the study can support. No review of
+Ghanaian institutional guidance was conducted.
 
-CANDO "build and apply a model". Four models are built and applied: a disclosure risk model covering uniqueness, k-anonymity and adversary-specific risk; a reconstruction and inference attack model in Phase 3; a linkage attack model in Phase 4; a constrained optimisation model producing the risk-utility frontier in Phase 5. An existing predictive model is repurposed as the utility measurement instrument.
+## 14. Fit
 
-Continuity with prior work. The dataset, the feature engineering and the XGBoost pipeline already exist. Nothing built to date is discarded. The earlier modelling work becomes an instrument within the new study rather than its subject. This study has no dependent variable, so it does not depend on the outstanding licensure outcome file.
+MSc Health Informatics. Health data privacy, disclosure control, secondary use
+and data governance are core to the discipline.
 
-## 13. Anchor literature
+CANDO "build and apply a model". A disclosure risk model, an inference attack
+that narrows generalised intervals, a linkage attack under justified adversary
+scenarios, and a release-construction procedure evaluated on a risk-utility
+frontier. An existing predictive model is repurposed as the utility instrument.
 
-Verify exact citations before use. These are the works the study should be positioned against.
+Continuity. The dataset, the feature engineering and the XGBoost pipeline already
+exist. The earlier modelling work becomes an instrument within the new study
+rather than its subject, and the study has no dependent variable, so it does not
+depend on the outstanding licensure outcome file.
+
+## 15. Anchor literature
+
+Verify every citation before use. These are positions to argue against, not
+sources already read.
 
 Foundational disclosure control:
 
-- Sweeney, L. Simple Demographics Often Identify People Uniquely (2000); k-anonymity: A Model for Protecting Privacy (2002)
-- Machanavajjhala, A. et al. l-diversity: Privacy Beyond k-anonymity (2007)
-- Li, N. et al. t-closeness: Privacy Beyond k-anonymity and l-diversity (2007)
+- Sweeney, L. Simple Demographics Often Identify People Uniquely (2000); k-anonymity (2002)
+- Machanavajjhala, A. et al. l-diversity (2007)
+- Li, N. et al. t-closeness (2007)
 - Dwork, C. Differential Privacy (2006)
 
 Re-identification demonstrations:
 
-- Narayanan, A. and Shmatikov, V. Robust De-anonymization of Large Sparse Datasets, on the Netflix Prize data (2008)
+- Narayanan, A. and Shmatikov, V. Robust De-anonymization of Large Sparse Datasets (2008)
 - de Montjoye, Y.-A. et al. Unique in the Crowd (2013)
-- Rocher, L., Hendrickx, J. and de Montjoye, Y.-A. Estimating the success of re-identifications in incomplete datasets using generative models, Nature Communications (2019)
+- Rocher, L., Hendrickx, J. and de Montjoye, Y.-A. Estimating the success of re-identifications in incomplete datasets using generative models (2019)
 
-Health data de-identification practice:
+Health data risk assessment and the risk-utility framing:
 
-- El Emam, K. Work on health data de-identification methodology and the prosecutor, journalist and marketer risk framework
-- HIPAA Safe Harbor and Expert Determination standards; UK Anonymisation Network guidance, as international comparators
+- El Emam, K. et al. R-U policy frontiers for health data de-identification
+- Work on assessing and minimising re-identification risk in research data derived from health care records
+- Work on enabling realistic health data re-identification risk assessment through adversarial modelling
+- Work on preventing unintended disclosure of personally identifiable data following anonymisation
 
 Ghanaian legal framework:
 
-- Data Protection Act, 2012 (Act 843) and Data Protection Commission guidance. Read these directly and check for amendments.
+- Data Protection Act, 2012 (Act 843), and Data Protection Commission guidance. Read directly and check for amendments.
 - Cybersecurity Act, 2020 (Act 1038)
 
-The gap to claim:
+The claim to make, once the systematic search supports it:
 
-- Learning analytics ethics literature, which is largely normative rather than quantitative
-- The absence of published quantitative disclosure risk work on health professions education records, together with the absence of any published treatment of derived-feature leakage
+- Limited empirical evidence addressing derived features computed at original
+  precision from variables that are generalised in the same release, in a
+  machine learning feature-engineering setting.
 
-## 14. Immediate next steps
+## 16. Outstanding before submission
 
-| Step | Action | Timing |
-|---|---|---|
-| 1 | Written confirmation that the data-sharing arrangement covers this research question | Week 1 |
-| 2 | Ethics submission | Week 1 |
-| 3 | Run a one-day uniqueness check on the existing dataset. What share of records is unique on programme, cohort year and the GPA sequence? | Week 1 |
-| 4 | Install and validate ARX, sdcMicro and pycanon against a known benchmark | Week 2 |
-| 5 | Confirm total cohort coverage. Is this all students, making the sampling fraction one? | Week 1 |
-
-Step 3 is the go/no-go. If uniqueness turns out near-total as expected, the study has its headline finding in week one and everything else builds on it. If uniqueness is unexpectedly low, the emphasis shifts toward attribute disclosure and the derived-feature experiments, both of which remain intact either way.
+1. Systematic literature search, to fix the novelty claim at whatever level the evidence supports.
+2. Fix the equivalence margin δ, with justification, before running the tests.
+3. Ethics approval reference number.
+4. Cross-check the risk implementation against an established package once.
+5. Decide whether the proposed title and two objectives are adopted, as one package with Methods section 8.
