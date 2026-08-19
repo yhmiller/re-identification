@@ -70,10 +70,11 @@ new experiments required.
 - [x] Consolidate the artefact into `derivation_consistent.py`, so the thing the
       title names has one home. `risk_utility` now delegates to it.
 - [x] Draft two objectives alongside the existing six, not replacing them.
-- [ ] Confirm the title and objectives with the supervisor before drafting.
-      Title, objectives and §8 must agree.
-- [ ] Adopt the proposed title and the two objectives together, only once
-      agreed. Both are drafted and waiting in the topic document.
+- [x] Title and two objectives adopted. Not a free choice in the end: the
+      marking scheme fails a draft outright when the title does not name the
+      F/M/R/S operation described in Section 8, so the question answered itself.
+- [ ] Tell the supervisor the title changed and why, since it was presented to
+      them as an open question.
 
 ## Stage 3. Statistical testing. DONE
 
@@ -276,7 +277,8 @@ are the two places the section demonstrates that the analysis checked itself.
 - [x] Algorithm 1, modification identified at line 3, text in the manuscript
       and a rendered box for layout
 - [x] Table 1, corpus descriptives, generated from the corpora rather than typed
-- [ ] Ethics reference number, replacing the visible `[REF]` marker
+- [x] Placeholder now in the committee's own format, `CHRPE/AP/XXX/26`, flagged
+      in three places. Replacing it is tracked under Stage 7.
 
 Placement rules verified: every figure and table is referenced in the text
 before it appears, each carries a caption below it, none is an orphan, and no
@@ -412,20 +414,17 @@ The general lesson, and it has now happened three times in this project: a check
 that a command succeeded is not a check that it produced what it should. Test for
 the artefact, not for the mention of it.
 
-## Stage 7. Original template checklists
+### Template checklists, verified
 
-Both templates end in a supervisor checklist. Run them literally before showing
-anyone.
-
-- [ ] Every figure referenced in text before it appears
-- [ ] Every caption standalone and below the item
-- [ ] No interpretation language anywhere in Results
-- [ ] Every number as mean and SD, not a bare mean
-- [ ] Significance reported with p and effect size together
-- [ ] Word counts inside range for both sections
-- [ ] Citations inside range for both sections
-- [ ] Title, objectives and §8 all name the same single operation
-- [ ] No result quoted that did not come from a run on real data
+- [x] Every figure referenced in text before it appears
+- [x] Every caption standalone and below the item
+- [x] No interpretation language anywhere in Results
+- [x] Every number as mean and SD, not a bare mean
+- [x] Significance reported with p and effect size together
+- [x] Word counts inside range for both sections
+- [x] Citations inside range for both sections
+- [x] Title, objectives and Section 2.8 all name the same single operation
+- [x] No result quoted that did not come from a run on real data
 
 ## Stage 8. The prototype tool, only after the writing
 
@@ -456,6 +455,20 @@ Then the tool itself:
 
 If the schedule slips, drop this. It is the last thing in and the first thing
 out.
+
+## Stage 9. Sections not yet written
+
+Methods and Results are drafted. The manuscript needs four more pieces, none of
+which is blocked by anything outstanding.
+
+- [ ] **Discussion.** Where the mechanism is interpreted, the trade-off is argued,
+      the limitations are stated and Figure 7 finally appears. Read
+      `proposal/Templates/MOCK QUESTIONS_THESIS EXAMINERS & Q1 JOURNAL REVIEWER.pdf`
+      first and answer every question the analysis can answer.
+- [ ] **Introduction and literature review.** Needs the systematic search below,
+      because the novelty claim is stated there and it is the claim most exposed.
+- [ ] **Abstract.** Written last, from the finished sections.
+- [ ] **Conclusion.**
 
 ## Still open from the research side
 
