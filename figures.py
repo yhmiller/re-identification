@@ -419,3 +419,229 @@ def build_all():
 if __name__ == "__main__":
     for path in build_all():
         print(f"wrote {path.relative_to(ROOT)}")
+
+
+# ---------------------------------------------------------------------------
+# Methods figures. These describe the procedure rather than plotting a result,
+# so they are drawn rather than read from a table.
+# ---------------------------------------------------------------------------
+
+INK = "#22262A"
+MUTED = "#6B7075"
+
+
+def _box(ax, x, y, w, h, text, face, edge, size=8.5, weight="normal"):
+    ax.add_patch(plt.Rectangle((x, y), w, h, facecolor=face, edgecolor=edge,
+                               linewidth=1.3, zorder=3))
+    ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=size,
+            color=INK, zorder=4, linespacing=1.45, fontweight=weight)
+
+
+def _arrow(ax, x1, y1, x2, y2, colour=MUTED, style="-|>", width=1.4):
+    ax.annotate("", xy=(x2, y2), xytext=(x1, y1),
+                arrowprops=dict(arrowstyle=style, color=colour, linewidth=width))
+
+
+def _canvas(w, h):
+    fig, ax = plt.subplots(figsize=(w, h))
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 10)
+    ax.axis("off")
+    return fig, ax
+
+
+def figure_architecture():
+    """Figure 1. The four phases, end to end."""
+    fig, ax = _canvas(8.6, 6.4)
+
+    _box(ax, 0.3, 8.3, 4.4, 1.1,
+         "Ghanaian health professions records\nallied health, n=110   nursing, n=566",
+         "#F2F4F5", NEUTRAL)
+    _box(ax, 5.3, 8.3, 4.4, 1.1,
+         "Public replication corpus\nUCI Student Performance, n=649",
+         "#FAFAFA", NEUTRAL)
+
+    for x in (2.5, 7.5):
+        _arrow(ax, x, 8.3, x, 7.5)
+
+    _box(ax, 0.3, 6.4, 9.4, 1.1,
+         "Phase 1   Corpus construction and de-identification\n"
+         "names discarded, index numbers replaced by keyed digests",
+         "#EFF3F6", BASELINE)
+    _arrow(ax, 5.0, 6.4, 5.0, 5.6)
+
+    _box(ax, 0.3, 4.5, 9.4, 1.1,
+         "Phase 2   Release construction\n"
+         "generalise source variables, derive features from one of two sources",
+         "#E8F1EC", PROPOSED)
+    _arrow(ax, 2.6, 4.5, 2.6, 3.7)
+    _arrow(ax, 7.4, 4.5, 7.4, 3.7)
+
+    _box(ax, 0.3, 2.6, 4.4, 1.1,
+         "Phase 3   Disclosure risk\nuniqueness, attacks",
+         "#EFF3F6", BASELINE)
+    _box(ax, 5.3, 2.6, 4.4, 1.1,
+         "Phase 4   Analytical utility\npredictive performance",
+         "#EFF3F6", BASELINE)
+
+    _arrow(ax, 2.5, 2.6, 4.4, 1.9)
+    _arrow(ax, 7.5, 2.6, 5.6, 1.9)
+    _box(ax, 2.6, 0.7, 4.8, 1.1,
+         "Risk-utility characterisation\nacross release configurations",
+         "#E8F1EC", PROPOSED, weight="bold")
+    return _save(fig, "figure_1_architecture")
+
+
+def figure_replication():
+    """Figure 2. Replication across corpora. There is no fusion point."""
+    fig, ax = _canvas(8.8, 5.6)
+
+    corpora = [
+        (0.3, "Allied health\nn = 110\n6 positions, 0 to 4\ncredit-weighted",
+         "study population", BASELINE, "#EFF3F6"),
+        (3.5, "Nursing\nn = 566\n6 positions, 0 to 4\nunweighted",
+         "study population", BASELINE, "#EFF3F6"),
+        (6.7, "Public\nn = 649\n3 positions, 0 to 20\nperiod grades",
+         "replication corpus", NEUTRAL, "#FAFAFA"),
+    ]
+    for x, text, role, edge, face in corpora:
+        _box(ax, x, 7.2, 3.0, 1.9, text, face, edge, size=8)
+        ax.text(x + 1.5, 6.95, role, ha="center", fontsize=7.5, color=MUTED,
+                style="italic")
+
+    for x in (1.8, 5.0, 8.2):
+        _arrow(ax, x, 6.75, x, 5.9)
+        _box(ax, x - 1.5, 4.6, 3.0, 1.3,
+             "Identical procedure\napplied independently", "#E8F1EC", PROPOSED,
+             size=8)
+        _arrow(ax, x, 4.6, x, 3.3)
+        _box(ax, x - 1.5, 2.0, 3.0, 1.3, "Results reported\nseparately",
+             "#F2F4F5", NEUTRAL, size=8)
+
+    ax.add_patch(plt.Rectangle((0.3, 0.35), 9.4, 1.15, facecolor="#FBF3F3",
+                               edgecolor="#C0392B", linewidth=1.2, zorder=3))
+    ax.text(5.0, 0.92,
+            "No fusion point. The corpora are never merged: grade scales, grade-point\n"
+            "definitions and sequence lengths differ, so a pooled corpus would attribute to the\n"
+            "procedure differences that arise from the measurement scales.",
+            ha="center", va="center", fontsize=8, color=INK, zorder=4,
+            linespacing=1.5)
+    return _save(fig, "figure_2_replication")
+
+
+def figure_baseline_vs_proposed():
+    """Figure 3. The two release constructions, with the modified step marked."""
+    fig, ax = _canvas(9.2, 5.0)
+
+    _box(ax, 3.4, 8.6, 3.2, 0.9, "Source sequence  X", "#F2F4F5", NEUTRAL, size=9)
+    _arrow(ax, 4.4, 8.6, 3.4, 7.3)
+    _arrow(ax, 5.6, 8.6, 6.6, 7.3)
+
+    ax.text(2.6, 7.35, "Baseline", ha="center", fontsize=10.5, color=BASELINE,
+            fontweight="bold")
+    ax.text(7.4, 7.35, "Proposed", ha="center", fontsize=10.5, color=PROPOSED,
+            fontweight="bold")
+
+    _box(ax, 0.4, 5.9, 4.4, 1.2, "Generalise\ng(X)", "#EFF3F6", BASELINE)
+    _box(ax, 5.2, 5.9, 4.4, 1.2, "Generalise\ng(X)", "#E8F1EC", PROPOSED)
+
+    _arrow(ax, 2.6, 5.9, 2.6, 4.9, BASELINE)
+    _arrow(ax, 7.4, 5.9, 7.4, 4.9, PROPOSED)
+
+    _box(ax, 0.4, 3.5, 4.4, 1.4, "Derive features from\nthe ORIGINAL values\n d(X)",
+         "#EFF3F6", BASELINE)
+    _box(ax, 5.2, 3.5, 4.4, 1.4,
+         "Derive features from\nthe GENERALISED values\n d(g(X))", "#E8F1EC", PROPOSED)
+
+    ax.annotate("", xy=(5.2, 4.2), xytext=(4.8, 4.2),
+                arrowprops=dict(arrowstyle="-|>", color="#C0392B", linewidth=2.0))
+    ax.text(5.0, 4.62, "[M]", ha="center", fontsize=10, color="#C0392B",
+            fontweight="bold")
+    ax.text(5.0, 3.02, "the single modified step", ha="center", fontsize=8,
+            color="#C0392B", style="italic")
+
+    _arrow(ax, 2.6, 3.5, 2.6, 2.5, BASELINE)
+    _arrow(ax, 7.4, 3.5, 7.4, 2.5, PROPOSED)
+    _box(ax, 0.4, 1.3, 4.4, 1.2, "R_baseline = [ g(X) | d(X) ]", "#EFF3F6", BASELINE, size=9)
+    _box(ax, 5.2, 1.3, 4.4, 1.2, "R_proposed = [ g(X) | d(g(X)) ]", "#E8F1EC", PROPOSED, size=9)
+
+    ax.text(5.0, 0.65,
+            "Both releases publish the same generalised columns and the same feature names.",
+            ha="center", fontsize=8.5, color=MUTED)
+    return _save(fig, "figure_3_baseline_vs_proposed")
+
+
+ALGORITHM_1 = """Algorithm 1: Derivation-consistent generalisation
+
+Input:  source sequence X (n x p), band width w, suppression threshold k,
+        derivation function d, derivation source mode m in {baseline, proposed}
+Output: release R
+
+1:  G <- generalise(X, w)                      band each source value
+2:  G, n_suppressed <- suppress(G, k)          blank classes below k
+3:  S <- X if m = baseline else G              <- [M] THE MODIFIED STEP
+4:  D <- d(S)                                  derive the published features
+5:  R <- [ G | D ]                             join and release
+6:  return R
+
+Only line 3 differs between the two arms. Lines 1, 2, 4 and 5 are identical,
+so any measured difference is attributable to the derivation source alone."""
+
+
+def algorithm_box():
+    """Algorithm 1, rendered to match the manuscript's figure conventions.
+
+    The text is also carried in manuscript/methods.md, which is authoritative
+    and editable. This image exists so the layout matches the other figures.
+    """
+    fig, ax = plt.subplots(figsize=(8.6, 4.0))
+    ax.axis("off")
+    ax.add_patch(plt.Rectangle((0, 0), 1, 1, transform=ax.transAxes,
+                               facecolor="#FBFCFC", edgecolor=BASELINE,
+                               linewidth=1.4, zorder=1))
+    for i, line in enumerate(ALGORITHM_1.split("\n")):
+        colour = "#C0392B" if "[M]" in line else INK
+        weight = "bold" if line.startswith("Algorithm") or "[M]" in line else "normal"
+        ax.text(0.03, 0.94 - i * 0.062, line, transform=ax.transAxes,
+                fontsize=8.2, family="monospace", color=colour,
+                fontweight=weight, va="top", zorder=3)
+    return _save(fig, "algorithm_1")
+
+
+def table_1_corpora():
+    """Table 1. Corpus descriptives, generated from the corpora themselves.
+
+    Written as CSV for the record and as Markdown for the manuscript, so the
+    numbers in the text cannot drift from the numbers in the data.
+    """
+    import strata as st
+
+    rows = []
+    for name, s in st.load_all().items():
+        seq = s.frame[s.sequence]
+        observed = seq.notna().sum(axis=1)
+        rows.append({
+            "Corpus": name.replace("_", " "),
+            "Role": "replication" if name == "public" else "study population",
+            "Students": s.n,
+            "Grade scale": "0 to 4" if s.scale_max == 4 else "0 to 20",
+            "Aggregate": ("credit-weighted CGPA" if name == "allied_health"
+                          else "unweighted mean" if name == "nursing" else "none"),
+            "Sequence positions": len(s.sequence),
+            "Positions observed, median": int(observed.median()),
+            "Quasi-identifiers": len(s.quasi_identifiers()),
+            "Demographics": len(s.demographics),
+            "Band widths": ", ".join(f"{w:g}" for w in s.band_widths),
+            "Sensitive prevalence": f"{s.frame[st.SENSITIVE].mean():.1%}",
+        })
+
+    frame = pd.DataFrame(rows).set_index("Corpus").T
+    frame.to_csv(RESULTS / "table_1_corpora.csv")
+
+    lines = ["| | " + " | ".join(frame.columns) + " |",
+             "|---" * (len(frame.columns) + 1) + "|"]
+    for label, row in frame.iterrows():
+        lines.append(f"| {label} | " + " | ".join(str(v) for v in row) + " |")
+    path = RESULTS / "table_1_corpora.md"
+    path.write_text("\n".join(lines) + "\n")
+    return path

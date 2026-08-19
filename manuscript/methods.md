@@ -38,7 +38,24 @@ set rather than an outcome to be modelled, so no outcome data was required.
 ## 2.2 Research setting and corpora
 
 Three corpora were used. Two constitute the study population; the third is a
-replication corpus, labelled as such throughout.
+replication corpus, labelled as such throughout. Their characteristics are
+summarised in Table 1.
+
+| | allied health | nursing | public |
+|---|---|---|---|
+| Role | study population | study population | replication |
+| Students | 110 | 566 | 649 |
+| Grade scale | 0 to 4 | 0 to 4 | 0 to 20 |
+| Aggregate | credit-weighted CGPA | unweighted mean | none |
+| Sequence positions | 6 | 6 | 3 |
+| Positions observed, median | 6 | 2 | 3 |
+| Quasi-identifiers | 15 | 18 | 8 |
+| Demographics | 0 | 0 | 4 |
+| Band widths | 0.25, 0.5, 1 | 0.25, 0.5, 1 | 1.25, 2.5, 5 |
+| Sensitive prevalence | 40.9% | 40.3% | 46.4% |
+
+*Table 1. Characteristics of the three corpora. Band widths are fractions of
+each corpus's grade range, as described in Section 2.7.*
 
 **Allied health.** Records for 110 students of Environmental Health,
 Occupational Health and Safety, and Occupational Therapy at the Accra School of
@@ -168,8 +185,27 @@ operator at width *w*, and *d* the derivation function of Section 2.6:
 
 The releases differ in the argument of *d* and in nothing else, publishing the
 same generalised columns and the same derived feature names. Figure 3 contrasts
-the two constructions with the modified step marked; Algorithm 1 gives the
+the two constructions with the modified step marked, and Algorithm 1 gives the
 procedure with that step identified at line 3.
+
+```
+Algorithm 1: Derivation-consistent generalisation
+
+Input:  source sequence X (n x p), band width w, suppression threshold k,
+        derivation function d, derivation source mode m in {baseline, proposed}
+Output: release R
+
+1:  G <- generalise(X, w)                      band each source value
+2:  G, n_suppressed <- suppress(G, k)          blank classes below k
+3:  S <- X if m = baseline else G              <- [M] THE MODIFIED STEP
+4:  D <- d(S)                                  derive the published features
+5:  R <- [ G | D ]                             join and release
+6:  return R
+```
+
+*Algorithm 1. Only line 3 differs between the two arms. Lines 1, 2, 4 and 5 are
+identical, so any measured difference is attributable to the derivation source
+alone.*
 
 ## 2.9 Training configuration and computing environment
 
