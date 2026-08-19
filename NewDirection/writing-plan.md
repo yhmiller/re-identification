@@ -191,7 +191,7 @@ information pathway that substantially reverses the privacy effect of
 generalisation. Arrows implying proven identity of information would overstate
 it, and the thesis does not need that claim.
 
-## Stage 5. Methods section. NEXT
+## Stage 5. Methods section. DRAFTED
 
 Target 1,800 to 2,200 words, 10 to 12 citations, fourteen subsections in the
 template's fixed order. Past tense for what was done, present for standing facts,
@@ -241,6 +241,42 @@ strata, not fusion. Say so plainly rather than forcing it into their fusion
 vocabulary, and justify why merging would be wrong: the grading scales, GPA
 definitions and sequence lengths differ.
 
+### Draft state
+
+`manuscript/methods.md`, 15 subsections, 2,420 words excluding headings.
+
+Over the template's 1,800 to 2,200 best-fit band, inside the 1,500 to 2,500 it
+quotes as the Elsevier norm, and well under the 2,800 at which it warns of a
+desk request to shorten. Every one of the 22 factual claims in the draft was
+verified against the code rather than transcribed from notes.
+
+The excess is not padding. Six methodological decisions each need justifying
+because each pre-empts a specific question: three corpora that are not pooled,
+a resampling scheme rejected on evidence, an equivalence test specified and
+removed, a corrected utility model, attribution measured from below, and a
+governance section for the one corpus carrying real identifiers.
+
+If the supervisor wants 2,200, cut in this order and lose about 220 words:
+
+1. Section 2.11, the interval-narrowing mechanics, to two sentences. The detail
+   belongs in the algorithm rather than the prose.
+2. Section 2.15, reproducibility, to the module list and the data-sharing
+   position.
+3. Section 2.2, the per-corpus descriptions, once Table 1 carries the same
+   figures.
+
+Cut nothing from 2.13. The rejected bootstrap and the removed equivalence test
+are the two places the section demonstrates that the analysis checked itself.
+
+### Still needed alongside
+
+- [ ] Figure 1, architecture. Four phases end to end
+- [ ] Figure 2, replication across three corpora, no fusion point
+- [ ] Figure 3, baseline against proposed with the modified step marked
+- [ ] Algorithm 1, with the modification identified at line 3
+- [ ] Table 1, corpus descriptives
+- [ ] Ethics reference number, replacing the visible `[REF]` marker
+
 ## Stage 6. Results section
 
 Target 1,500 to 2,000 words, 4 to 8 citations, five to seven figures and tables.
@@ -258,8 +294,10 @@ classifier study. "Feature importance" becomes attribute identifying power, and
 "error analysis" becomes attack success and containment. Both keep the template's
 intent, which is to show where the method works and where it does not.
 
-- [ ] Measure runtimes for §8. Nothing has been timed. Cheap, and the template
-      requires it.
+- [x] Runtimes measured for the efficiency subsection: 3.6 ms to build a
+      release, 5.2 ms for a risk profile, 0.17 s for the reconstruction attack
+      over 566 records, 2.66 s for a full 25-fold utility evaluation. They belong
+      in Results section 8 rather than Methods, per the template.
 
 ## Stage 7. Verification
 
