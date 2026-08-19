@@ -15,11 +15,11 @@ yet satisfy.
 
 | Requirement | Source | Status |
 |---|---|---|
-| A public dataset **and** primary field data | Methods template, called non-negotiable | Missing. Two institutional strata, no public arm. |
+| A public dataset **and** primary field data | Methods template, called non-negotiable | Done. Stage 1. |
 | Exactly one engineering operation, F/M/R/S | Methods §8 | Not framed. Reads as a study, not an artefact. |
 | Title naming the artefact, matching §8 | Methods Part 0 | Current title is a question. Mismatch is a desk-reject. |
 | Two objectives, each mapping to a subsection | Methods Part 0 | Currently six objectives. |
-| p-value **and** effect size on the main comparison | Results §5 | No significance testing anywhere yet. |
+| p-value **and** effect size on the main comparison | Results §5 | Done. Stage 3. |
 | Figures at 300 dpi or vector | Results, placement rules | No figures produced at all. |
 | Training and inference timings | Results §8 | Not measured. |
 | Ethics reference number | Methods §4 | Approval granted; number not yet in any file. |
@@ -75,99 +75,110 @@ new experiments required.
 - [ ] Adopt the proposed title and the two objectives together, only once
       agreed. Both are drafted and waiting in the topic document.
 
-## Stage 3. Statistical testing
+## Stage 3. Statistical testing. DONE
 
-The Results template requires a p-value and an effect size on the main
-comparison. Nothing in the analysis currently produces either.
+Completed 19 August 2026. Specification frozen in
+`NewDirection/analysis-specification.md`, results in
+`docs/disclosure-risk-findings.md`, tables in
+`results/disclosure/confirmatory_*.csv`.
 
-Two tests are needed, and they are not the same test.
+The plan changed twice while running, both times because a check failed rather
+than because a result was unwelcome. Both changes are documented rather than
+tidied away.
 
-**Risk side, a difference test.** Uniqueness under the leaky release against the
-safe release. There is one number per configuration, so a distribution has to
-come from bootstrap resampling of records. B = 2000 resamples, paired
-differences, Wilcoxon signed-rank plus Cohen's d. Expect a very large effect.
+**Equivalence testing was removed.** TOST was specified while the two arms were
+believed to perform identically. Correcting the utility model showed differences
+of -0.027, -0.135 and -0.067, so an equivalence test at any defensible margin
+fails everywhere and conveys nothing the point estimate does not. The paired
+difference and its interval are reported instead, which is strictly more
+informative because a reader with a different tolerance can apply it directly.
 
-**Utility side, an equivalence test.** The claim is that the two releases give
-identical model utility, which is a claim of no difference. A non-significant
-Wilcoxon does not establish that; absence of evidence is not evidence of absence.
-The correct instrument is **TOST**, two one-sided tests against an equivalence
-margin fixed in advance.
+**delta left the hypotheses entirely.** It survives only as a tolerance a
+custodian brings to the frontier, with 0.02 as a labelled illustrative default.
+Because it enters no test, when it was chosen no longer matters, which dissolves
+the pre-registration problem rather than arguing around it.
 
-### Fixing the equivalence margin, delta
+**The ordinary bootstrap was rejected on evidence.** Duplicated records are not
+unique, so resampling with replacement changes the estimand rather than
+perturbing the estimator, and asymmetrically between arms. Subsampling without
+replacement at 80% replaced it. The diagnostic that caught it was built in
+beforehand.
 
-This is a decision, not something the data yields. Three candidates, with what
-each commits the study to:
+**Effect sizes are unstandardised.** Both metrics are bounded and interpretable
+in their own units, and standardising would divide by a variance that repeated
+cross-validation makes ambiguous.
 
-| delta (AUC-PR) | Reads as | Risk |
-|---|---|---|
-| 0.01 | Any difference beyond a hundredth of a point matters | Strictest. Hardest to pass, strongest claim if it passes |
-| **0.02** | A difference below two points is not actionable | **Recommended** |
-| 0.05 | Only a substantial difference matters | Easiest to pass, weakest claim, invites the objection that the margin was chosen to succeed |
+- [x] Subsample-difference comparison for risk, in `stats_validation.py`
+- [x] Paired fold comparison for utility, naive and dependence-corrected
+- [x] Per-fold scores retained in `risk_utility`
+- [x] `notebooks/08_confirmatory_tests.py` runs both across three corpora
+- [ ] Adviser to confirm the fold-dependence correction suits this design
 
-**Recommend delta = 0.02 AUC-PR, absolute.** The justification must come from the
-application rather than from the observed numbers: a custodian comparing release
-configurations is deciding whether a research use remains viable, and a
-two-point AUC-PR difference sits below the fold-to-fold variation of the
-measurement itself at these sample sizes. A difference smaller than the noise in
-its own measurement cannot be acted on. Confirm this against the observed fold
-standard deviation once per-fold scores are retained, and if the fold SD exceeds
-0.02, raise delta to match it rather than reporting an equivalence the design
-cannot detect.
+### What the numbers say, stated at the strength they support
 
-### An honesty note that belongs in the methods
+Risk reduction is distinguishable from zero in eight of nine configurations.
+Utility cost is distinguishable from zero in six of nine: every nursing and every
+public configuration, and none of the three allied health configurations, where
+corrected p values are 0.890, 0.361 and 0.854.
 
-The frontier has already been run, so the point estimates are known. A margin
-fixed now is not blind, and the write-up must say so rather than describe it as
-pre-registered.
+The allied health null is a power result at 109 modelled records, not evidence of
+no cost, and it coheres with Phase 5 finding that same corpus too small to
+protect at all.
 
-The defence is that delta is justified on decision-relevance grounds that are
-independent of the observed difference, and that the observed difference is
-approximately zero, so no choice of margin in the plausible range changes the
-conclusion. Both facts should be stated. A reader who suspects the margin was
-reverse-engineered can check the first claim against the justification and the
-second against the reported estimates.
+Monotonicity is not claimed. Allied health utility does not order with band
+width and public risk reverses between the two widest bands. The correct wording
+is that wider generalisation generally produced greater risk reduction
+accompanied by greater utility loss across the evaluated configurations.
 
-- [ ] Fix delta with the supervisor and record the decision with its date.
-- [ ] Retain per-fold scores so the fold SD can be checked against delta.
+An earlier summary of this stage claimed that no interval crossed zero on either
+axis. That was wrong, and the correction is recorded here and in the findings
+document rather than quietly amended.
 
-This distinction is worth a sentence in the Methods. An examiner who knows
-statistics will ask how equivalence was established, and "p was not significant"
-is the wrong answer.
+## Stage 4. Figures
 
-- [ ] Implement bootstrap paired comparison in `stats_validation.py`.
-- [ ] Implement TOST with a stated margin.
-- [ ] Report both with effect sizes, per the settled convention of reporting d
-      beside every p regardless of significance.
+Stage 4 is communication, not new science. Nothing here should introduce another
+layer of methodological complexity; the analysis is finished.
 
-## Stage 4. Figures and tables
+Four figures, each telling one story. The Results template caps figures and
+tables at five to seven, so these four plus two tables fits with room to spare.
 
-The Results template names seven required items and caps the total at five to
-seven. Vector or 300 dpi, caption below, referenced in text before appearing,
-no orphans.
+**Figure A, the mechanism.** The central contribution in one image.
+Generalisation lowers risk; derived features computed from the originals raise it
+again; recomputing them from the protected values holds the reduction. Baseline
+against proposed on the same axis.
 
-| Item | Content | Source |
-|---|---|---|
-| Table 1 | Descriptive statistics of the three corpora | consolidation outputs |
-| Figure 1 | System architecture | to draw |
-| Figure 2 | Data fusion, three strata into one procedure | to draw |
-| Figure 3 | Baseline against proposed, the one modification highlighted | to draw |
-| Algorithm 1 | Derivation-consistent generalisation, the modified step marked | to write |
-| Table 2 | Ablation, revert to source-derived features | `experiment_c_*.csv` |
-| Table 3 | Main comparison, risk and utility, mean and SD | `risk_utility_frontier.csv` |
-| Figure 4 | Risk-utility frontier, three strata | `risk_utility_frontier.csv` |
-| Figure 5 | Cross-validation stability box plot across 25 folds | new run, needs per-fold scores retained |
-| Figure 6 | Attribute identifying power, the SHAP analogue | `solo_identifying_power.csv` |
-| Figure 7 | Reconstruction success by band width | `experiment_b_*.csv` |
+**Figure B, the frontier.** Risk reduction against utility retained, all
+configurations, all three corpora, Pareto set marked. This is the decision
+figure and the one a custodian would actually use.
 
-That is eleven candidates for five to seven slots, so some move to supplementary
-material. Figures 1 to 3 and Algorithm 1 belong to Methods; the rest to Results.
+**Figure C, stability.** Distribution of the paired per-fold differences, now
+that the scores are retained. Shows the effect is not one lucky average, and
+shows honestly that the allied health distribution straddles zero.
 
-- [ ] `risk_utility.cross_validated_utility` currently returns means only.
-      Retain per-fold scores so Figure 5 and the Wilcoxon are possible.
-- [ ] Build a `figures.py` with one function per figure, 300 dpi, consistent
-      palette, no seaborn defaults.
-- [ ] Match the template's visual conventions: dashed blue-grey for baseline,
-      solid green for proposed, value labels, no caption inside the image.
+**Figure D, the explanation.** A flow diagram from generalisation through
+derivation to the two outcomes, risk and utility, for one representative
+configuration. Non-specialist readable, and the eventual basis of the prototype
+tool's main screen.
+
+Methods additionally needs Figure 1 (architecture), Figure 3 (baseline against
+proposed, the one modification marked) and Algorithm 1. Table 1 describes the
+corpora; Table 2 carries the confirmatory results.
+
+- [x] Per-fold scores retained, so Figure C is possible
+- [ ] `figures.py`, one function per figure, 300 dpi, no seaborn defaults
+- [ ] Baseline dashed blue-grey, proposed solid green, value labels on points,
+      captions below the figure and never inside the image
+- [ ] Figure C must show the allied health spread rather than only the means.
+      A figure that hides the one non-significant corpus would be the kind of
+      selective presentation this project has avoided so far
+
+### One caution for the figures
+
+Do not let a diagram assert more than the experiment supports. The defensible
+claim is that the results are consistent with derived features acting as an
+information pathway that substantially reverses the privacy effect of
+generalisation. Arrows implying proven identity of information would overstate
+it, and the thesis does not need that claim.
 
 ## Stage 5. Methods section
 
@@ -189,7 +200,8 @@ Subsections and what fills each:
 9. Training configuration and computing environment
 10. Experimental design and reproducibility, five folds by five seeds, fixed seeds
 11. Evaluation metrics, disclosure risk and utility, each against its floor
-12. Statistical analysis, bootstrap Wilcoxon and TOST
+12. Statistical analysis: subsampling for risk, paired folds with a
+    dependence correction for utility, the rejected bootstrap and why
 13. Ablation study, plus Table 2
 14. Reproducibility artefacts, repository, and what cannot be shared
 
