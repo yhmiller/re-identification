@@ -3,11 +3,18 @@
 Do the features a machine learning pipeline derives from student grades undo the
 de-identification applied to those grades?
 
-Measurably, yes. Publishing derived features at original precision alongside
-generalised source variables removes **98.7% to 100%** of the uncertainty the
-generalisation introduced, while giving **identical** model utility to
-recomputing them from the protected values. On those two axes the baseline
-release is dominated rather than a trade-off.
+Measurably, yes, and the leak is not free to close.
+
+Publishing derived features at original precision alongside generalised source
+variables restores **98.7% to 100%** of the disclosure risk the generalisation
+removed, and **99.4% to 109.8%** of the analytical utility it removed. Those two
+figures agree because it is the same information seen from two sides. The
+generalisation is, for practical purposes, undone.
+
+Recomputing the derived features from the protected values closes the leak, and
+costs **2.7 to 13.5 AUC-PR points** depending on the corpus. That is a genuine
+privacy-utility trade-off, not a free fix, and the frontier is what a custodian
+chooses from.
 
 Prince Bortey Miller | 22388461 | MSc Health Informatics, KNUST, 2026
 Supervisor: Dr. Eric Opoku Osei
@@ -65,6 +72,8 @@ or about Ghanaian institutions rests on it. See [strata.py](strata.py).
 | Attributes needed to reach 100% unique | 2 | 5 | 6 |
 | Uncertainty removed by baseline derivation | 100% | 98.7-100% | 67-89% |
 | Source values narrowed to a point | 20.9-33.9% | 34.1-62.8% | 74.1-93.7% |
+| Utility restored by baseline derivation | 109.8% | 99.4% | 99.5% |
+| Utility cost of closing the leak (AUC-PR) | -0.027 | -0.135 | -0.067 |
 
 Group size protects: Spearman **-0.893** across 11 groups of the study
 population spanning 5 to 238 students, **-0.880** across all 13 groups spanning

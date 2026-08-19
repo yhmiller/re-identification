@@ -141,6 +141,12 @@ Do not re-open these without a reason.
 - **Statistical tests.** Wilcoxon with Cohen's d for difference claims, α = 0.05.
   Equivalence claims need TOST against a stated margin, because a non-significant
   difference test does not establish equivalence.
+- **The utility model receives what the recipient receives.** Generalised source
+  columns plus the derived features published alongside them, with the derived
+  features computed over the predictor positions only so the target cannot leak
+  into them. Passing only the source columns makes the two derivation arms
+  identical by construction and produces a finding that is arithmetic rather than
+  evidence.
 - **Module layout.** Logic lives in flat modules at the repo root, not a `src/`
   package, so the numbered notebooks stay pasteable into Colab.
 - **Synthetic data.** Pipeline testing only. Never merged into a corpus to
@@ -190,8 +196,20 @@ variables generalised in the same release, in a machine learning
 feature-engineering setting, measured under a controlled comparison in which
 only the derivation source differs.
 
-Utility is identical to three decimal places between the two arms in every
-configuration tested, which places the baseline release below the proposed one
-on both axes rather than opposite it on a trade-off. Whether that difference is
-statistically equivalent rather than merely non-significant requires an
-equivalence test against a prespecified margin, which is outstanding.
+The two arms differ in utility, and substantially. An earlier version of this
+pipeline reported them as identical, which was an artefact: the utility model was
+given only the generalised source columns, which are byte-identical between the
+arms, so it never saw the derived features that are the only thing separating
+them. Corrected, the model receives what a recipient actually receives.
+
+Derived features computed from unprotected source values restore
+approximately all of the analytical utility that generalisation removed, between
+99.4% and 109.8% across the three corpora, and approximately all of the
+disclosure risk it removed, between 98.7% and 100%. Those two figures agree
+because it is the same information seen from two sides. Closing the leak
+therefore has a price: recomputing the derived features from the protected
+values costs 2.7 to 13.5 AUC-PR points depending on the corpus.
+
+The baseline release is therefore not dominated. It sits on the frontier at the
+high-utility, low-protection end. The contribution is the measured trade-off and
+the mechanism behind it, not a free fix.

@@ -50,12 +50,16 @@ XGB_PARAMS = {
 }
 
 
-def cross_validated_utility(X, y, seed=BASE_SEED):
+def cross_validated_utility(X, y, seed=BASE_SEED, return_folds=False):
     """Mean AUC-ROC and AUC-PR over 5 folds repeated across 5 seeds.
 
     Both are reported against their no-skill floor, 0.5 for AUC-ROC and the
     prevalence for AUC-PR. Without that an AUC-PR of 0.74 at a prevalence of
     0.35 reads as far better than it is.
+
+    `return_folds` adds the per-fold scores. The confirmatory analysis needs
+    them: a mean cannot be paired, and both the equivalence test and the
+    stability plot operate on the 25 individual observations.
     """
     X = np.asarray(X, dtype=float)
     y = np.asarray(y, dtype=int)
@@ -75,18 +79,20 @@ def cross_validated_utility(X, y, seed=BASE_SEED):
         roc_scores.append(roc_auc_score(y[test_idx], proba))
         pr_scores.append(average_precision_score(y[test_idx], proba))
 
-    return {
+    out = {
         "n_folds_scored": len(roc_scores),
         "prevalence": prevalence,
         "auc_roc": float(np.mean(roc_scores)) if roc_scores else np.nan,
         "auc_pr": float(np.mean(pr_scores)) if pr_scores else np.nan,
-        "auc_roc_above_floor": (
-            float(np.mean(roc_scores)) - 0.5 if roc_scores else np.nan
-        ),
-        "auc_pr_above_floor": (
-            float(np.mean(pr_scores)) - prevalence if pr_scores else np.nan
-        ),
+        "auc_roc_sd": float(np.std(roc_scores, ddof=1)) if len(roc_scores) > 1 else np.nan,
+        "auc_pr_sd": float(np.std(pr_scores, ddof=1)) if len(pr_scores) > 1 else np.nan,
+        "auc_roc_above_floor": float(np.mean(roc_scores)) - 0.5 if roc_scores else np.nan,
+        "auc_pr_above_floor": float(np.mean(pr_scores)) - prevalence if pr_scores else np.nan,
     }
+    if return_folds:
+        out["fold_auc_roc"] = roc_scores
+        out["fold_auc_pr"] = pr_scores
+    return out
 
 
 def apply_release(frame, semester_cols, band_width, suppress_k, derived_mode):
@@ -109,6 +115,7 @@ def frontier_row(
     band_width=None,
     suppress_k=None,
     derived_mode="none",
+    return_folds=False,
 ):
     """One point on the frontier: what this configuration protects, and costs."""
     release = dc.build(frame, semester_cols, band_width, suppress_k, derived_mode)
@@ -116,20 +123,43 @@ def frontier_row(
 
     risk = dr.risk_profile(released, release.visible_columns)
 
-    # Utility uses only the predictors, which the model would actually consume.
-    usable = released[predictors].join(frame[[target]]).dropna()
-    utility = (
-        cross_validated_utility(usable[predictors], usable[target])
-        if len(usable) > 20 and usable[target].nunique() > 1
-        else {
-            "n_folds_scored": 0,
-            "prevalence": np.nan,
-            "auc_roc": np.nan,
-            "auc_pr": np.nan,
-            "auc_roc_above_floor": np.nan,
-            "auc_pr_above_floor": np.nan,
+    # Utility uses what the recipient actually receives: the generalised
+    # predictor columns plus the derived features published alongside them.
+    #
+    # An earlier version passed only the source columns. Those are byte-identical
+    # between the two derivation arms, so the model never saw the one thing that
+    # differs between them and utility came out identical by construction. That
+    # was an artefact, not a finding.
+    #
+    # Derived features here are computed over the predictor positions only, not
+    # the whole sequence. The sensitive attribute derives from the final observed
+    # position, so deriving over the full sequence would leak the target into the
+    # features.
+    features = released[predictors]
+    if release.mode != dc.NONE:
+        origin = frame if release.mode == dc.BASELINE else released
+        derived = di.derive_features(origin, predictors)
+        informative = [c for c in derived.columns if derived[c].nunique() > 1]
+        features = features.join(derived[informative])
+
+    usable = features.join(frame[[target]]).dropna()
+    feature_columns = [c for c in usable.columns if c != target]
+    if len(usable) > 20 and usable[target].nunique() > 1:
+        utility = cross_validated_utility(
+            usable[feature_columns], usable[target], return_folds=return_folds
+        )
+    else:
+        utility = {
+            k: np.nan
+            for k in (
+                "prevalence", "auc_roc", "auc_pr", "auc_roc_sd", "auc_pr_sd",
+                "auc_roc_above_floor", "auc_pr_above_floor",
+            )
         }
-    )
+        utility["n_folds_scored"] = 0
+        if return_folds:
+            utility["fold_auc_roc"] = []
+            utility["fold_auc_pr"] = []
 
     return {
         "config": label,
@@ -138,6 +168,7 @@ def frontier_row(
         "derived_mode": release.mode,
         "records_suppressed": suppressed,
         "n_modelled": len(usable),
+        "n_features": len(feature_columns),
         "prop_unique": risk.prop_unique,
         "min_class_size": risk.min_class_size,
         "marketer_risk": risk.marketer_risk,
