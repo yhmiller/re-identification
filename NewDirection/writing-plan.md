@@ -232,6 +232,36 @@ anyone.
 - [ ] Title, objectives and §8 all name the same single operation
 - [ ] No result quoted that did not come from a run on real data
 
+## Stage 8. The prototype tool, only after the writing
+
+Optional, and scheduled last on purpose. The thesis must be complete and
+defensible without it.
+
+Two additions to the analysis it depends on, both small and both worth doing
+regardless:
+
+- [ ] SHAP over the utility model, on the unprotected release against each
+      protected one. AUC-PR says whether the analysis survives; it does not say
+      whether the model relies on the same features afterwards. A shift in
+      importance at constant performance is a utility finding that the scalar
+      hides. Reuses the existing SHAP infrastructure.
+- [ ] A single function that turns a release configuration into the numbers a
+      custodian needs: risk, drivers, leakage, retained utility, recommendation
+      against a threshold. The notebooks already compute all five separately.
+
+Then the tool itself:
+
+- [ ] Aggregate by construction. Reports over a dataset, never over a record. No
+      record-level output rendered, exported or logged.
+- [ ] Real data stays in the approved environment. Any demonstration outside it
+      runs on the replication corpus or on synthetic input.
+- [ ] Reuse the existing Streamlit chassis for layout and deployment only. Its
+      upload-and-explain-each-student flow is the opposite of what this study
+      argues and must not be carried across.
+
+If the schedule slips, drop this. It is the last thing in and the first thing
+out.
+
 ## Still open from the research side
 
 Neither blocks writing, and both strengthen the Discussion.

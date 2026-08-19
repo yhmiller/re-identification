@@ -155,7 +155,8 @@ title, objectives and Methods section 8 must all agree.
    recomputed from the protected values rather than from the originals.
 2. To quantify the disclosure risk and the analytical utility of that procedure
    against standard generalisation, using hybrid public and institutional
-   academic data.
+   academic data, and to identify the attributes and derived features that drive
+   the measured risk.
 
 The six above are not discarded. Objectives 1, 2 and 4 become results reported
 under proposed objective 2; objective 3 becomes the ablation; objective 5 becomes
@@ -179,6 +180,38 @@ quasi-identifier configuration, with prosecutor risk reported alongside.
 4. Analytical utility: predictive performance retained on the protected release.
 
 Everything else is diagnostic and belongs in supplementary material.
+
+### Explainability, and which kind
+
+Reporting that a dataset is 87.5% unique tells a custodian nothing they can act
+on. Reporting *which attributes make it so* tells them what to protect. That
+interpretive layer sits inside the secondary outcomes rather than becoming a
+separate objective, because it answers "why" about the primary outcome rather
+than asking a new question.
+
+Two distinct things get called explainability and only one of them is central
+here.
+
+**Disclosure-risk explainability, central.** Why is this release risky, which
+attributes carry the risk, how few does an adversary need, and what changes when
+a protection configuration is applied. Phase 2 already produces this: identifying
+power per attribute, the greedy accumulation curve, the group-size relationship,
+and the interval-narrowing measurements that show which derived features leak and
+by how much. It needs naming and surfacing, not building.
+
+**Model explainability, secondary and repurposed.** SHAP over the utility model,
+used for a question the utility metric cannot answer. AUC-PR says whether the
+protected release still supports the analysis. It does not say whether the model
+is relying on the same things. If generalisation shifts feature importance while
+holding performance constant, the release preserves accuracy while changing what
+drives it, which is a finding a custodian should hear and which a single scalar
+hides. This reuses the existing SHAP infrastructure for a purpose the earlier
+scope never had.
+
+The explanatory work therefore attaches to proposed objective 2, which already
+covers disclosure risk and analytical utility. It does not need a third
+objective, and adding one would undo the tightening the two-objective structure
+was for.
 
 ## 5. Research questions
 
@@ -410,6 +443,36 @@ Practical:
 3. A procedural recommendation: recompute derived features from protected data,
    rather than releasing them alongside generalised sources at original
    precision.
+4. A prototype decision-support tool, if time permits after the written work.
+
+### The prototype tool, and its hard constraint
+
+A custodian choosing a release configuration currently has no way to see what
+they are choosing. A prototype would let them select a configuration and read
+back the risk, the drivers of that risk, the leakage from derived features, the
+retained utility, and a recommendation against a stated risk threshold.
+
+It is a demonstration of the findings, not a finding. The thesis must stand
+without it, and it is scheduled after the written work rather than beside it. If
+the schedule slips, it is the first thing to drop.
+
+**One constraint is not negotiable, and the existing codebase gets it wrong.**
+The tool from the previous scope accepts an uploaded spreadsheet of students and
+renders per-student explanations. For a study arguing that academic records
+disclose individuals, a tool that displays individuals would be self-defeating,
+and an examiner would be right to say so.
+
+The prototype is therefore aggregate by construction:
+
+- It reports over a dataset, never over a record.
+- No record-level output is rendered, exported or logged.
+- Real student data stays inside the approved environment. Any public-facing
+  demonstration runs on the replication corpus or on synthetic input.
+- Uploaded data, if upload is supported at all, is summarised and discarded
+  rather than displayed.
+
+The existing app is a usable chassis for layout and deployment. Its per-student
+explanation flow is not reusable and should not be carried across.
 
 ### On "isn't this obvious?"
 
