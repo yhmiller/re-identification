@@ -282,7 +282,7 @@ Placement rules verified: every figure and table is referenced in the text
 before it appears, each carries a caption below it, none is an orphan, and no
 invented ethics number appears anywhere in the file.
 
-## Stage 6. Results section. NEXT
+## Stage 6. Results section. DRAFTED
 
 Target 1,500 to 2,000 words, 4 to 8 citations, five to seven figures and tables.
 
@@ -294,10 +294,38 @@ Eight subsections: descriptive summary, baseline against proposed,
 cross-validation stability, ablation, statistical significance, attribute
 importance, error analysis, computational efficiency.
 
-Two adaptations are needed because this is a disclosure study rather than a
-classifier study. "Feature importance" becomes attribute identifying power, and
-"error analysis" becomes attack success and containment. Both keep the template's
+Two adaptations were made because this is a disclosure study rather than a
+classifier study. "Feature importance" became attribute identifying power, and
+"error analysis" became attack success and containment. Both keep the template's
 intent, which is to show where the method works and where it does not.
+
+### Draft state
+
+`manuscript/results.md`, ten subsections, 1,573 words of prose.
+
+Checklist run literally, all passing:
+
+| Requirement | Status |
+|---|---|
+| Word count 1,500 to 2,000 | 1,573 |
+| Figures and tables, 5 to 7 | 6 (Figures 4 to 6, Tables 2 to 4) |
+| In-text citations, 4 to 8 | 4 |
+| Every item referenced before it appears | yes |
+| Every item captioned | yes |
+| No interpretation language | no banned phrase present |
+| Means reported with SD | yes |
+| p reported with effect size | yes, effect size is the raw difference |
+| No-skill floors stated | yes |
+
+Writing it surfaced a Methods-Results inconsistency worth recording. Section 2.10
+lists prosecutor risk and the share of records below k thresholds as reported
+measures, and the first draft of Results gave neither. Both are now reported in
+Section 3.2. Drafting the two sections against each other is what caught it; a
+checklist alone would not have.
+
+The explanation figure is deliberately not in Results. It carries an
+interpretation of the mechanism, which belongs in the Discussion, and Results is
+already at six items against a cap of seven.
 
 - [x] Runtimes measured for the efficiency subsection: 3.6 ms to build a
       release, 5.2 ms for a risk profile, 0.17 s for the reconstruction attack
