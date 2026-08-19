@@ -1,4 +1,7 @@
-# Re-identification Risk in Health Professions Education Records
+# Derivation-Consistent De-identification of Health Professions Education Records
+
+Disclosure Risk and Analytical Utility Under Hybrid Public and Institutional
+Academic Data
 
 Do the features a machine learning pipeline derives from student grades undo the
 de-identification applied to those grades?
@@ -38,7 +41,8 @@ same values. This study measures that configuration and prices the fix.
 
 The engineered contribution is **derivation-consistent generalisation**. One
 modification: derived features are recomputed from the protected values rather
-than from the originals. It closes the hole at no cost in model utility.
+than from the originals. It closes the hole, and the cost of closing it is
+measured rather than assumed away.
 
 > **Scope note.** This replaced an earlier study predicting licensure failure
 > from the same records, which could not proceed because the outcome column was
@@ -151,6 +155,107 @@ from.
 
 ---
 
+## Repository structure
+
+```
+re-identification/
+│
+├── strata.py                    corpus definitions, column roles, band widths
+├── deidentify.py                banding, suppression, the 8 derived features
+├── derivation_consistent.py     THE ARTEFACT: NONE / BASELINE / PROPOSED
+├── disclosure_risk.py           uniqueness, k, l, t, adversary risk
+├── attack_models.py             interval-propagation reconstruction, linkage
+├── risk_utility.py              release configs, cross-validated utility
+├── stats_validation.py          subsampling, paired folds, dependence correction
+├── figures.py                   every figure, the algorithm box, Table 1
+├── run_all.py  run.sh           one-command runner over the five stages
+│
+├── notebooks/                   orchestration only, no logic
+│   ├── 04_disclosure_risk.py            Phases 1 and 2, baseline risk
+│   ├── 05_derived_feature_experiments.py Phase 3, Experiments A, B, C
+│   ├── 06_linkage_attack.py             Phase 4, adversarial validation
+│   ├── 07_risk_utility_frontier.py      Phase 5, the frontier
+│   └── 08_confirmatory_tests.py         pre-specified confirmatory comparisons
+│
+├── scripts/
+│   ├── consolidate_real_data.py     allied health workbooks to one frame
+│   ├── consolidate_nursing_data.py  nursing workbooks, HMAC pseudonymisation
+│   ├── build_model_dataset.py       assembles the modelling frame
+│   └── md2docx.py  read_docx.py  build_merged_pdf.py   writing tools
+│
+├── docs/                        tracked. The thesis itself
+│   ├── manuscript/              methods.md, results.md
+│   ├── literature/              protocol, query log, sources, gap analysis
+│   ├── NewDirection/            topic document, writing plan, analysis spec
+│   └── disclosure-risk-findings.md    authoritative record of every measurement
+│
+├── data/         gitignored. Raw workbooks and the built corpora
+├── local/        gitignored. The HMAC salt
+├── proposal/     gitignored. Ethics paperwork, templates, marking schemes
+├── results/      gitignored. Every table and figure, all reproducible
+└── ml_env/       gitignored. Python 3.11 virtualenv
+```
+
+Four directories are gitignored and must be carried by hand when the repository
+is cloned somewhere new. `results/` regenerates from one command, `ml_env/`
+rebuilds from `requirements.txt`, but `data/` and `local/` cannot be
+reconstructed and are the only irreplaceable things here. `local/.nursing_salt`
+in particular: lose it and no nursing pseudonym can ever be reproduced, which
+makes every nursing result unrepeatable.
+
+---
+
+## Architecture
+
+Four layers, each depending only on the one above it. No cycles, and no module
+in the analysis layer imports anything from a notebook.
+
+```
+     strata.py                     what the corpora are
+         │
+         ▼
+     deidentify.py                 how a release is protected
+         │
+         ▼
+  derivation_consistent.py         the one operation under test
+         │
+    ┌────┴─────────────┬──────────────────┐
+    ▼                  ▼                  ▼
+disclosure_risk.py  risk_utility.py  attack_models.py
+    │                  │                  │
+    └────────┬─────────┴──────────────────┘
+             ▼
+     stats_validation.py            does the difference survive testing
+             │
+             ▼
+     notebooks/04-08  →  results/  →  figures.py  →  docs/manuscript/
+```
+
+**Why flat modules and not a `src/` package.** The numbered notebooks stay
+pasteable into Colab, which matters because the examiners may want to run one.
+A package layout would require an install step before anything ran.
+
+**Why notebooks hold no logic.** Every notebook is orchestration: load a corpus,
+call the modules, write a CSV. Anything a result depends on lives in a module
+that another notebook can import, so no finding exists in only one place.
+
+**The two-arm design is the whole architecture.** `derivation_consistent.py`
+exposes three modes and `build()` differs between BASELINE and PROPOSED on one
+line, the line that chooses the derivation source. Banding, suppression, the
+risk metrics and the utility model are identical across arms. That is what makes
+any measured difference attributable to the derivation source and nothing else,
+and it is why the artefact has its own module rather than living as a flag
+inside `risk_utility`.
+
+**Where the data flows.** Raw workbooks in `data/` are consolidated once by the
+`scripts/`, read by `strata.py`, protected by `deidentify.py`, released by
+`derivation_consistent.py`, measured by the three analysis modules, tested by
+`stats_validation.py`, and written to `results/disclosure/` as CSV. `figures.py`
+reads only those CSVs, never the corpora, so a figure cannot disagree with the
+table it came from.
+
+---
+
 ## Modules
 
 | File | Role |
@@ -221,9 +326,10 @@ Full list in [requirements.txt](requirements.txt).
 ## Citation
 
 ```
-Miller, P. B. (2026). Re-identification Risk in Ghanaian Health Professions
-Education Records: Do Derived Features Undermine De-identification?
-[MSc thesis]. Kwame Nkrumah University of Science and Technology.
+Miller, P. B. (2026). Derivation-Consistent De-identification of Health
+Professions Education Records: Disclosure Risk and Analytical Utility Under
+Hybrid Public and Institutional Academic Data [MSc thesis]. Kwame Nkrumah
+University of Science and Technology.
 ```
 
 ---

@@ -35,9 +35,11 @@ RESULTS.mkdir(parents=True, exist_ok=True)
 # risk coincide.
 SAMPLING_FRACTION = 1.0
 
-ROLES = {"allied_health": "study population",
-         "nursing": "study population",
-         "public": "replication corpus"}
+ROLES = {
+    "allied_health": "study population",
+    "nursing": "study population",
+    "public": "replication corpus",
+}
 
 
 def scenarios_for(s):
@@ -65,21 +67,31 @@ def scenarios_for(s):
 
 
 def run_stratum(s):
-    print(f"\n{'=' * 78}\n{s.name}  ({ROLES[s.name]}): {s.n} students, "
-          f"{s.scale}\n  '{st.SENSITIVE}' prevalence "
-          f"{s.frame[st.SENSITIVE].mean():.1%}\n{'=' * 78}")
+    print(
+        f"\n{'=' * 78}\n{s.name}  ({ROLES[s.name]}): {s.n} students, "
+        f"{s.scale}\n  '{st.SENSITIVE}' prevalence "
+        f"{s.frame[st.SENSITIVE].mean():.1%}\n{'=' * 78}"
+    )
 
-    profiles = dr.profile_table(s.frame, scenarios_for(s), sensitive=st.SENSITIVE,
-                                sampling_fraction=SAMPLING_FRACTION)
+    profiles = dr.profile_table(
+        s.frame,
+        scenarios_for(s),
+        sensitive=st.SENSITIVE,
+        sampling_fraction=SAMPLING_FRACTION,
+    )
     profiles.insert(0, "role", ROLES[s.name])
     profiles.insert(0, "stratum", s.name)
 
     print("PHASE 1  risk by adversary knowledge")
-    print(f"  {'scenario':<26}{'unique':>9}{'min k':>7}{'classes':>9}{'marketer':>10}{'l':>4}")
+    print(
+        f"  {'scenario':<26}{'unique':>9}{'min k':>7}{'classes':>9}{'marketer':>10}{'l':>4}"
+    )
     for _, r in profiles.iterrows():
-        print(f"  {r['label']:<26}{r['prop_unique']:>8.1%}{r['min_class_size']:>7}"
-              f"{r['n_equivalence_classes']:>9}{r['marketer_risk']:>10.3f}"
-              f"{r['min_l_diversity']:>4.0f}")
+        print(
+            f"  {r['label']:<26}{r['prop_unique']:>8.1%}{r['min_class_size']:>7}"
+            f"{r['n_equivalence_classes']:>9}{r['marketer_risk']:>10.3f}"
+            f"{r['min_l_diversity']:>4.0f}"
+        )
 
     full_qi = s.quasi_identifiers()
 
@@ -87,23 +99,30 @@ def run_stratum(s):
     solo.insert(0, "stratum", s.name)
     print("\nPHASE 2  identifying power of each attribute alone (top 5)")
     for _, r in solo.head(5).iterrows():
-        print(f"  {r['attribute']:<20} distinct {r['n_distinct_values']:>4}   "
-              f"unique alone {r['prop_unique_alone']:>6.1%}")
+        print(
+            f"  {r['attribute']:<20} distinct {r['n_distinct_values']:>4}   "
+            f"unique alone {r['prop_unique_alone']:>6.1%}"
+        )
 
     curve = dr.saturation_curve(s.frame, full_qi)
     curve.insert(0, "stratum", s.name)
     print("\nPHASE 2  uniqueness as attributes accumulate (greedy)")
     for _, r in curve.iterrows():
-        print(f"  {r['n_attributes']} attribute(s): +{r['added']:<16} "
-              f"unique {r['prop_unique']:>6.1%}")
+        print(
+            f"  {r['n_attributes']} attribute(s): +{r['added']:<16} "
+            f"unique {r['prop_unique']:>6.1%}"
+        )
 
-    sweep = dr.precision_sweep(s.frame, s.structural + s.sequence,
-                               sampling_fraction=SAMPLING_FRACTION)
+    sweep = dr.precision_sweep(
+        s.frame, s.structural + s.sequence, sampling_fraction=SAMPLING_FRACTION
+    )
     sweep.insert(0, "stratum", s.name)
     print("\nPHASE 1  rounding the grade sequence")
     for _, r in sweep.iterrows():
-        print(f"  {r['label']:<14} unique {r['prop_unique']:>6.1%}   "
-              f"min k {r['min_class_size']:>3}")
+        print(
+            f"  {r['label']:<14} unique {r['prop_unique']:>6.1%}   "
+            f"min k {r['min_class_size']:>3}"
+        )
 
     anchor = "cgpa" if "cgpa" in s.frame.columns else s.sequence[-1]
     effect = dr.group_size_effect(s.frame, [s.group, anchor], [s.group], precision=1)
@@ -111,9 +130,11 @@ def run_stratum(s):
     effect.insert(0, "stratum", s.name)
     print(f"\nPHASE 2  within-group uniqueness on {anchor} at 1dp, by group size")
     for _, r in effect.iterrows():
-        print(f"  {str(r[s.group]):<12} n={int(r['group_size']):>4}  "
-              f"unique {r['prop_unique_within_group']:>6.1%}  "
-              f"min k {int(r['min_class_size'])}")
+        print(
+            f"  {str(r[s.group]):<12} n={int(r['group_size']):>4}  "
+            f"unique {r['prop_unique_within_group']:>6.1%}  "
+            f"min k {int(r['min_class_size'])}"
+        )
 
     return profiles, solo, curve, sweep, effect
 
@@ -125,26 +146,40 @@ def main():
         for key, frame in zip(collected, run_stratum(s)):
             collected[key].append(frame)
 
-    names = {"profiles": "baseline_risk_profiles", "solo": "solo_identifying_power",
-             "curve": "saturation_curve", "sweep": "precision_sweep",
-             "effect": "group_size_effect"}
+    names = {
+        "profiles": "baseline_risk_profiles",
+        "solo": "solo_identifying_power",
+        "curve": "saturation_curve",
+        "sweep": "precision_sweep",
+        "effect": "group_size_effect",
+    }
     for key, frames in collected.items():
         pd.concat(frames, ignore_index=True).to_csv(
-            RESULTS / f"{names[key]}.csv", index=False)
+            RESULTS / f"{names[key]}.csv", index=False
+        )
 
     # Does a bigger cohort protect anyone? Pooled across corpora because the
     # relationship is between group size and uniqueness, which is scale-free,
     # not between grades that differ from corpus to corpus.
     effect = pd.concat(collected["effect"], ignore_index=True)
-    corr = effect["group_size"].corr(effect["prop_unique_within_group"], method="spearman")
-    print(f"\n{'=' * 78}\nCROSS-CORPUS  group size against within-group uniqueness\n{'=' * 78}")
-    print(f"  groups: {len(effect)}   size range: {int(effect['group_size'].min())} "
-          f"to {int(effect['group_size'].max())}   Spearman: {corr:+.3f}")
+    corr = effect["group_size"].corr(
+        effect["prop_unique_within_group"], method="spearman"
+    )
+    print(
+        f"\n{'=' * 78}\nCROSS-CORPUS  group size against within-group uniqueness\n{'=' * 78}"
+    )
+    print(
+        f"  groups: {len(effect)}   size range: {int(effect['group_size'].min())} "
+        f"to {int(effect['group_size'].max())}   Spearman: {corr:+.3f}"
+    )
 
     study_only = effect[effect["stratum"] != "public"]
     corr_study = study_only["group_size"].corr(
-        study_only["prop_unique_within_group"], method="spearman")
-    print(f"  study population only: {len(study_only)} groups, Spearman {corr_study:+.3f}")
+        study_only["prop_unique_within_group"], method="spearman"
+    )
+    print(
+        f"  study population only: {len(study_only)} groups, Spearman {corr_study:+.3f}"
+    )
 
     print(f"\nwrote {len(names)} tables to {RESULTS.relative_to(ROOT)}/")
 

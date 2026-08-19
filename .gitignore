@@ -49,3 +49,6 @@ Thumbs.db
 # The *linkage* rule above keeps the SID-to-index table out of git. It also
 # catches this analysis script by name. The script contains code, not data.
 !notebooks/06_linkage_attack.py
+
+# Agent working notes. Local only, never published.
+/AGENT.md
