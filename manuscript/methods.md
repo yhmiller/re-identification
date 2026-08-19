@@ -39,6 +39,13 @@ source from which those features are derived. Banding, suppression, risk
 metrics, model, hyperparameters and fold assignments were held identical, so any
 measured difference is attributable to the derivation source alone.
 
+![Figure 1](../results/disclosure/figures/figure_1_architecture.png)
+
+*Figure 1. The four study phases. Institutional records and the public
+replication corpus enter separately, pass through de-identification and release
+construction, and are evaluated for disclosure risk and analytical utility before
+the risk-utility characterisation.*
+
 The study has no dependent variable. Disclosure risk is a property of a released
 set rather than an outcome to be modelled, so no outcome data was required.
 
@@ -97,6 +104,12 @@ fitted on C_i is applied to C_j, no records are concatenated, and no pooled
 corpus is formed at any point. The public corpus serves as the out-of-domain
 replication, separating properties of the procedure from properties of a
 setting.
+
+![Figure 2](../results/disclosure/figures/figure_2_replication.png)
+
+*Figure 2. Cross-validation replication. The identical procedure is applied
+independently to each corpus and reported separately. There is no fusion point,
+because the corpora are not commensurable.*
 
 Early, late and intermediate-transfer fusion were rejected because the corpora
 are not commensurable in grade scale, grade-point definition or sequence length,
@@ -228,6 +241,12 @@ argument of d and in nothing else, publishing the same generalised columns and
 the same derived feature names. Figure 3 contrasts the two constructions with the
 modified step marked, and Algorithm 1 gives the procedure with that step
 identified at line 3.
+
+![Figure 3](../results/disclosure/figures/figure_3_baseline_vs_proposed.png)
+
+*Figure 3. The two release constructions. Generalisation, concatenation and the
+published column set are identical; the two arms differ only in the argument
+supplied to the derivation function, marked [M].*
 
 ```
 Algorithm 1: Derivation-consistent generalisation

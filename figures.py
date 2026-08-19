@@ -6,18 +6,19 @@ no image can drift out of step with the table it came from.
 
 Methods items describe the procedure and are drawn:
 
-    architecture           the four phases end to end
-    replication            three corpora, no fusion point
-    baseline_vs_proposed   the two releases with the modified step marked
-    algorithm_box          the procedure, modification at line 3
+    architecture           Figure 1, the four phases end to end
+    replication            Figure 2, three corpora, no fusion point
+    baseline_vs_proposed   Figure 3, the two releases with the modified step marked
+    algorithm_box          Algorithm 1, the procedure, modification at line 3
     table_1_corpora        corpus descriptives, generated from the corpora
 
 Results items plot measurements and are read from the result tables:
 
-    mechanism    what the derived features do to the protection
-    frontier     the decision a custodian actually faces
-    stability    whether the effect survives looking at individual folds
-    explanation  the whole argument, for a reader who is not a privacy specialist
+    mechanism    Figure 4, what the derived features do to the protection
+    frontier     Figure 5, the decision a custodian actually faces
+    stability    Figure 6, whether the effect survives looking at individual folds
+    explanation  Figure 7, the whole argument for a non-specialist reader.
+                 Belongs to the Discussion, not the Results
 
 Conventions follow the Q1 results template. Baseline is dashed blue-grey,
 proposed is solid green, values are labelled on the marks so a reader never has
@@ -134,7 +135,7 @@ def figure_mechanism():
 
     axes[0].set_ylabel("Records uniquely identifiable", fontsize=9.5)
     axes[0].yaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
-    return _save(fig, "figure_a_mechanism")
+    return _save(fig, "figure_4_mechanism")
 
 
 def figure_frontier():
@@ -202,7 +203,7 @@ def figure_frontier():
     second = ax.legend(handles=fill_keys, fontsize=8, frameon=False,
                        loc="lower center", title="Release", title_fontsize=8.5)
     second._legend_box.align = "left"
-    return _save(fig, "figure_b_frontier")
+    return _save(fig, "figure_5_frontier")
 
 
 def figure_stability():
@@ -298,7 +299,7 @@ def figure_stability():
         ),
     ]
     ax.legend(handles=handles, fontsize=8, frameon=False, loc="lower right")
-    return _save(fig, "figure_c_stability")
+    return _save(fig, "figure_6_stability")
 
 
 def figure_explanation():
@@ -415,7 +416,7 @@ def figure_explanation():
         color="#6B7075",
         linespacing=1.5,
     )
-    return _save(fig, "figure_d_explanation")
+    return _save(fig, "figure_7_explanation")
 
 
 def build_all():

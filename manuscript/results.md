@@ -116,6 +116,8 @@ the proposed derivation was within 0.005 of the generalised release in all three
 
 The four release states are shown in Figure 4.
 
+![Figure 4](../results/disclosure/figures/figure_4_mechanism.png)
+
 *Figure 4. Records uniquely identifiable under four releases in each corpus:
 unprotected, generalised, generalised with derived features computed from the
 original values, and generalised with the same features recomputed from the
@@ -165,6 +167,8 @@ was marginally smaller at band 5.00 than at band 2.50.
 
 Figure 6 presents the distribution of the 225 paired per-fold AUC-PR differences,
 25 for each of nine configurations.
+
+![Figure 6](../results/disclosure/figures/figure_6_stability.png)
 
 *Figure 6. Paired per-fold AUC-PR differences, proposed minus baseline
 derivation, for three band widths in each corpus. Each point is one of 25 folds.
@@ -252,6 +256,8 @@ The target was retained in the candidate set in 100% of all 72 linkage runs.
 
 Figure 5 plots risk reduction against retained utility for every configuration
 in all three corpora.
+
+![Figure 5](../results/disclosure/figures/figure_5_frontier.png)
 
 *Figure 5. Disclosure risk reduction against analytical utility retained,
 expressed as percentages of the unprotected release. Marker shape denotes corpus

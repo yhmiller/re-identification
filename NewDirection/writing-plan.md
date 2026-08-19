@@ -391,6 +391,27 @@ worth less than one that admits the gap.
 - [ ] Optional: trim Methods from 2,729 toward the 2,200 safe range. No deduction
       applies below 2,800, so this is polish rather than a requirement.
 
+### Figures were referenced but not placed
+
+Caught by inspection, not by the audit. The first audit checked rubric section 15
+by testing whether the string "Figure 1" appeared in the file. That tests for a
+reference, not for an image, so it reported a pass while both manuscripts
+contained zero image embeds and the three Methods figures had no captions at all.
+Section 15 would have scored 1 of 3.
+
+Now fixed and verified properly: every figure is embedded, the file it points to
+exists on disk, it carries a caption below it, and it is referenced in the text
+before it appears. Both PNG at 300 dpi and PDF are produced for each.
+
+Figure files were also renamed to carry their manuscript number. They had been
+`figure_a` through `figure_d`, which meant anyone placing them had to remember
+that a maps to 4. They are now `figure_4_mechanism` and so on, and the old names
+were deleted rather than left as stale duplicates.
+
+The general lesson, and it has now happened three times in this project: a check
+that a command succeeded is not a check that it produced what it should. Test for
+the artefact, not for the mention of it.
+
 ## Stage 7. Original template checklists
 
 Both templates end in a supervisor checklist. Run them literally before showing
