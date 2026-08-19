@@ -185,7 +185,7 @@ Analysis complete. Writing not started.
 - [ ] Title and two objectives adopted, or not, as one package with Methods §8
 - [ ] Optional and last: prototype tool, written framework, differential privacy arm
 
-Full plan: [NewDirection/writing-plan.md](NewDirection/writing-plan.md).
+Full plan: [docs/NewDirection/writing-plan.md](docs/NewDirection/writing-plan.md).
 
 ---
 
@@ -206,7 +206,7 @@ risk is attributable to the derivation source and nothing else.
 - **Ablation.** Revert the derivation step. Protection collapses by 98.7% to
   100% across the study population, and by 67% to 89% on the replication corpus.
 
-The claim is transfer, not novelty, and the scoping search in `literature/`
+The claim is transfer, not novelty, and the scoping search in `docs/literature/`
 settled that. Released statistics leak (Dinur and Nissim, 2003) and derivation
 consistency is standing practice in tabular disclosure control, where agencies
 run an additivity-restoring step after perturbation. Neither has been carried

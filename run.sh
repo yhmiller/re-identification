@@ -5,8 +5,9 @@
 #   ./run.sh
 #
 # Sets up the Python environment the first time (downloads dependencies),
-# then runs Stage 1 + Stage 2 end-to-end. All figures, tables and metrics
-# are written to results/. Safe to re-run: setup is skipped once it exists.
+# then runs the five analysis stages and rebuilds every manuscript figure and
+# table. Outputs are written to results/disclosure/. Safe to re-run: setup is
+# skipped once the environment exists.
 #
 set -euo pipefail
 cd "$(dirname "$0")"

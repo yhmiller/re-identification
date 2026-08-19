@@ -1,24 +1,26 @@
 # Participant data. Nothing under here may ever reach the remote: the raw
-# college records, the survey exports, and the SID-to-index linkage table are
-# all directly or indirectly identifying.
+# college records, the nursing workbooks, and the SID-to-index linkage table
+# are all directly or indirectly identifying.
 data/
 *.xlsx
 *.xls
-*.docx
 anonymised_records.csv
 raw_college_records.*
 *linkage*
 *_linkage.csv
 
-# Manuscript drafts, ethics paperwork, questionnaires, and the reference
-# thesis collection. These carry consent forms and third-party student work.
-/proposal
-/docs/*
+# The HMAC key that pseudonymises index numbers. Publishing it would make
+# every pseudonym in every released table reversible by dictionary attack.
 /local
 
-# Generated artefacts. Every one is reproducible with ./run.sh.
+# Ethics paperwork, consent forms, questionnaires, and the reference thesis
+# collection. Third-party work and signed documents.
+/proposal
+
+# Generated artefacts. Every one is reproducible from the notebooks.
 /results
 *.pkl
+*.docx
 
 # Environments
 ml_env/
@@ -37,15 +39,13 @@ Thumbs.db
 # Tooling
 .gstack/
 
-# Explicit exceptions: documentation that is safe to publish and is tracked
-# despite the /docs rule above.
-!docs/E-XGBoost-technical-documentation.md
-!docs/TODO.md
-# Aggregate findings only. No record-level result, no identifier, no student
-# name or index number appears anywhere in it.
-!docs/disclosure-risk-findings.md
+# NOTE: docs/ is deliberately NOT ignored here. The manuscript, the literature
+# review and the topic document are the thesis and belong under version
+# control. The predecessor repository ignored /docs/* wholesale, which meant
+# moving these directories into docs/ removed them from git without warning.
+# Every file under docs/ carries aggregate findings only: no record-level
+# result, no identifier, no student name or index number appears in any of them.
 
-# The *linkage* rule above exists to keep the SID-to-index linkage table out of
-# git. It also catches this analysis script by name. The script contains code,
-# not data, so it is tracked.
+# The *linkage* rule above keeps the SID-to-index table out of git. It also
+# catches this analysis script by name. The script contains code, not data.
 !notebooks/06_linkage_attack.py

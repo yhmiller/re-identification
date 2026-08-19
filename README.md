@@ -117,14 +117,19 @@ Requires **Python 3.11**. The pinned libraries do not support 3.12 or later.
 
 ```bash
 brew install python@3.11          # macOS
-git clone https://github.com/yhmiller/xgboost-shap-nursing-licensure.git
-cd xgboost-shap-nursing-licensure
-./run.sh                          # builds ml_env on first use
+git clone <remote URL>
+cd re-identification
+./run.sh                          # builds ml_env on first use, then runs everything
 ```
 
 ---
 
 ## Run order
+
+`./run.sh` runs the five stages and rebuilds every figure. To run a stage on
+its own, which is what the writing process actually needs, call it directly.
+The corpus builders are separate because they read `data/` and only need
+re-running when the source workbooks change.
 
 ```bash
 ml_env/bin/python scripts/consolidate_real_data.py             # allied health
@@ -152,8 +157,10 @@ from.
 | [disclosure_risk.py](disclosure_risk.py) | uniqueness, k-anonymity, l-diversity, t-closeness, adversary risk |
 | [deidentify.py](deidentify.py) | banding, suppression, the single derived-feature definition |
 | [attack_models.py](attack_models.py) | interval-propagation reconstruction, linkage under side knowledge |
+| [derivation_consistent.py](derivation_consistent.py) | the named artefact: NONE, BASELINE, PROPOSED release modes |
 | [risk_utility.py](risk_utility.py) | release configurations, cross-validated utility |
-| `baseline_xgboost.py`, `engineered_xgboost.py` | retained from the earlier scope as the utility measurement instrument |
+| [stats_validation.py](stats_validation.py) | subsampling for risk, paired fold comparison for utility |
+| [figures.py](figures.py) | every manuscript figure, algorithm box, and Table 1 |
 
 Logic lives in flat modules at the repo root so the numbered notebooks stay
 pasteable into Colab.
