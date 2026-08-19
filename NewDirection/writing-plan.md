@@ -494,9 +494,16 @@ and the contribution claim is reframed from novelty to transfer.
 - [ ] Read the ten sources marked critical in `literature/sources.md`. Nothing
       is currently based on more than an abstract
 - [ ] Run the database searches listed in `literature/protocol.md`
-- [ ] Apply the revised wording from `literature/gap-analysis.md` to the topic
-      document, the introduction and the contribution list
-- [ ] Add DeSIA and the cell-key literature to the Methods citations
+- [x] Applied the revised wording to the topic document's research gap,
+      contribution list and anchor literature, and to the README and project
+      guide. Section 2 of the topic document is now a three-part statement:
+      what is established and cited, what the search did not locate, and the
+      transfer claim that survives
+- [x] Added the tabular-consistency precedent to Methods Section 2.8, which is
+      where the operation is positioned. Methods citations now 13, inside the
+      10 to 14 target, and prose at 2,790 words, just inside the 2,800 threshold
+- [ ] Read the ten critical sources before any of these citations is submitted.
+      Every one is currently based on an abstract or a landing page
 
 ## Sequence
 

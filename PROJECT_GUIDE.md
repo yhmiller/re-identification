@@ -206,12 +206,13 @@ risk is attributable to the derivation source and nothing else.
 - **Ablation.** Revert the derivation step. Protection collapses by 98.7% to
   100% across the study population, and by 67% to 89% on the replication corpus.
 
-The claim is not that generalisation is novel, nor that nobody has considered
-derived-feature leakage. It is that this specific combination has received
-limited empirical attention: features computed at original precision from
-variables generalised in the same release, in a machine learning
-feature-engineering setting, measured under a controlled comparison in which
-only the derivation source differs.
+The claim is transfer, not novelty, and the scoping search in `literature/`
+settled that. Released statistics leak (Dinur and Nissim, 2003) and derivation
+consistency is standing practice in tabular disclosure control, where agencies
+run an additivity-restoring step after perturbation. Neither has been carried
+into microdata generalisation for machine learning, and the tabular literature
+does not ask what enforcing consistency costs an analyst because nobody there is
+fitting a model to the release. This study carries it across and prices it.
 
 The two arms differ in utility, and substantially. An earlier version of this
 pipeline reported them as identical, which was an artefact: the utility model was

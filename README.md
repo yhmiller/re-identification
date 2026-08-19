@@ -29,9 +29,12 @@ grade sequence is a fingerprint: in the allied health corpus, CGPA alone
 identifies 96.4% of students, and any two attributes identify all of them.
 
 The study measures that residual risk, tests whether generalisation reduces it,
-and examines a mechanism that has received limited empirical attention: features
-computed from source variables before those variables are generalised continue to
-disclose information about them afterwards.
+and measures a transfer. That released statistics leak, and that a protected
+quantity and its derivations must be treated consistently, are both established
+in tabular disclosure control. Neither appears to have been carried into
+microdata generalisation for machine learning, where features derived from
+unprotected values are routinely published beside a generalised version of those
+same values. This study measures that configuration and prices the fix.
 
 The engineered contribution is **derivation-consistent generalisation**. One
 modification: derived features are recomputed from the protected values rather

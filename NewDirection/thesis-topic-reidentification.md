@@ -99,34 +99,100 @@ does about it, and leaves the regulatory gap analysis to work equipped to do it.
 
 ## 2. Research gap
 
-Two things are established and one is not.
+Revised 19 August 2026 against the scoping search in `literature/`. Three
+positions, stated at the strength the evidence supports.
 
-**Established.** Removing identifiers does not produce anonymity, and residual
-risk is measurable. Health data privacy research has developed the metrics, the
-adversary models and the risk-utility framing this study uses.
+### Established, and cited rather than claimed
 
-**Established.** Information that looks non-identifying can still disclose after
-anonymisation, and derived or transformed representations can leak about their
-sources. The general concern is not new.
+**Released statistics leak information about their source.** Dinur and Nissim
+(2003) proved that releasing statistics from a confidential source reveals
+information about it, and that sufficiently many sufficiently accurate answers
+expose the underlying microdata. The result is known as the Fundamental Law of
+Information Recovery, and Abowd et al. (2023) demonstrated it against real
+published census statistics.
 
-**Not established.** What has received limited empirical attention is the
-specific combination this study addresses: features derived from source variables
-at their original precision, released alongside a generalised version of those
-same variables, in a setting where the derived features are exactly the ones a
-machine learning pipeline produces. Two assumptions are commonly made and neither
-is well evidenced. The first is that releasing only derived summaries, rather
-than records, is protective. The second is that generalisation applied to a
-source variable also protects variables computed from it.
+**Few aggregates suffice.** DeSIA (Mao et al., 2025) mounts attribute inference
+against a limited, fixed set of aggregates and concludes that aggregation alone
+does not protect privacy even when few statistics are released. This study's
+summary-only release experiment reaches the same conclusion on eight derived
+features, and is therefore reported as a **replication in a new setting rather
+than as a discovery**.
 
-This framing is deliberately narrower than an earlier draft, which asserted that
-the failure mode "has not been examined anywhere" and that "no published work
-quantifies it". Those claims are not defensible without a systematic search, and
-a single counter-example would sink them. The claim now made is about limited
-evidence for a specific combination of setting, operation and attack, which is
-what the study can actually support.
+**Consistency between a protected quantity and its derivations is established
+practice, in tabular official statistics.** Perturbing a table breaks additivity,
+so agencies including the Australian Bureau of Statistics run an
+additivity-restoring step, and enforce that the same cell appearing in different
+tables receives the same perturbation. The principle that inconsistent treatment
+of a protected quantity and the quantities derived from it is itself exploitable
+is not new.
 
-A systematic literature search is required before submission, and its result may
-narrow this claim further. That is expected rather than a risk.
+**Education records have been studied as a disclosure-control problem.** Vatsalan
+et al. (2022) quantify re-identification risk in education data and explicitly
+treat grades from separate examination attempts as quasi-identifiers whose
+combination indicates a particular student. An earlier draft of this proposal
+described the learning analytics literature as largely normative rather than
+quantitative. That was wrong and is withdrawn.
+
+### What the search did not locate
+
+No source was found that measures the specific configuration studied here, on
+four counts together:
+
+1. **Generalisation of microdata**, rather than perturbation of tabular aggregates.
+2. Derived features computed from the **original** values and released in the
+   **same file** as the generalised source columns.
+3. In a **machine learning feature-engineering** setting, where those features
+   exist because a model consumes them.
+4. With the **utility cost of enforcing consistency measured**, so that the
+   trade-off is quantified rather than asserted.
+
+The fourth is the clearest space. The official statistics literature treats
+consistency as a correctness requirement to be engineered away; it does not ask
+what enforcing it costs an analyst, because in that setting nobody is fitting a
+model to the release.
+
+### The claim this study makes
+
+Not that a failure mode has gone unnoticed, but that a principle established in
+one field has not been carried into another, and that its price there is
+unmeasured.
+
+> That released statistics leak, and that a protected quantity and its
+> derivations must be treated consistently, are both established. Neither appears
+> to have been carried into microdata generalisation for machine learning, where
+> features derived from unprotected values are routinely published alongside a
+> generalised version of those same values. This study measures that
+> configuration and measures what enforcing consistency costs the analyst.
+
+This is narrower than the earlier framing and harder to dislodge. "Nobody has
+examined this" fails to a single counter-example. "Known there, not done here,
+and here is the price" invites the examiner to test a transfer argument, which
+the study can support.
+
+### Health professions specifically
+
+What remains unexamined within the education literature is the health professions
+case, where the record links to professional licensure and to workforce
+registration, and where the attribute at the end of that chain is
+career-determining in a small professional community.
+
+### Ghanaian estimates
+
+No empirical re-identification risk estimate for Ghanaian health data was
+located. Comparable measurement exists elsewhere in the region, notably a
+de-identification framework applied to a paediatric cohort in Uganda, so the
+contribution is the Ghanaian estimate rather than the application of the method
+to African health data.
+
+### Status of the search
+
+The search behind this section is a **structured scoping search over the open
+web**, with a registered protocol and a verbatim query log in `literature/`. It
+is not a systematic review: no bibliographic database was searched, no citation
+chasing was performed, no second screener was used, and no source has yet been
+read in full. `literature/protocol.md` states what must be added before this
+section may use the word systematic, and the ten sources marked critical must be
+read before they are cited.
 
 ## 3. Aim and objectives
 
@@ -468,20 +534,34 @@ consistent transformation of derived features inside a generalisation workflow.
 
 ## 11. Expected contribution
 
-Academic:
+Revised against the scoping search. Each claim is stated at the strength the
+evidence supports.
 
-1. Quantified residual re-identification risk for a category of health data that
-   has attracted little attention, in a setting with no published estimates.
-2. An empirical treatment of derived-feature leakage under generalisation:
-   a controlled baseline-against-proposed comparison, quantified effect on
-   disclosure risk, tested against a simulated attack, with the utility cost
-   measured.
-3. Measured rather than estimated uniqueness within the defined population,
+**Academic**
+
+1. **The first empirical re-identification risk estimates for Ghanaian health
+   data.** Comparable measurement exists elsewhere in the region, so the
+   contribution is the Ghanaian estimate rather than the method.
+2. **The first treatment of health professions education records as a
+   disclosure-control problem.** Education data has been studied; the health
+   professions case, where the record links to licensure and workforce
+   registration, has not.
+3. **The transfer of derivation consistency from tabular disclosure control to
+   microdata generalisation, with its cost measured.** The principle is
+   established in official statistics as a correctness requirement. This study
+   carries it to machine learning microdata release and quantifies what enforcing
+   it costs the analyst, which the tabular literature does not ask because nobody
+   there is fitting a model to the release.
+4. **Measured rather than estimated uniqueness** within the defined population,
    avoiding the sampling-fraction assumption most comparable work must make.
-4. Replication of the mechanism on an independent public corpus, separating what
-   is a property of the arithmetic from what is a property of the setting.
+5. **Replication of the mechanism on an independent public corpus**, separating
+   what is a property of the arithmetic from what is a property of the setting.
 
-Practical:
+Claim 3 replaces an earlier claim that the mechanism was unexamined. The scoping
+search found three adjacent literatures, one of them close, and the transfer
+framing is what survives them.
+
+**Practical**
 
 1. A proposed operational framework that institutions could adopt and that could
    inform future guidance.
@@ -489,37 +569,8 @@ Practical:
    this be protected before it stops being useful?
 3. A procedural recommendation: recompute derived features from protected data,
    rather than releasing them alongside generalised sources at original
-   precision.
-4. A prototype decision-support tool, if time permits after the written work.
-
-### The prototype tool, and its hard constraint
-
-A custodian choosing a release configuration currently has no way to see what
-they are choosing. A prototype would let them select a configuration and read
-back the risk, the drivers of that risk, the leakage from derived features, the
-retained utility, and a recommendation against a stated risk threshold.
-
-It is a demonstration of the findings, not a finding. The thesis must stand
-without it, and it is scheduled after the written work rather than beside it. If
-the schedule slips, it is the first thing to drop.
-
-**One constraint is not negotiable, and the existing codebase gets it wrong.**
-The tool from the previous scope accepts an uploaded spreadsheet of students and
-renders per-student explanations. For a study arguing that academic records
-disclose individuals, a tool that displays individuals would be self-defeating,
-and an examiner would be right to say so.
-
-The prototype is therefore aggregate by construction:
-
-- It reports over a dataset, never over a record.
-- No record-level output is rendered, exported or logged.
-- Real student data stays inside the approved environment. Any public-facing
-  demonstration runs on the replication corpus or on synthetic input.
-- Uploaded data, if upload is supported at all, is summarised and discarded
-  rather than displayed.
-
-The existing app is a usable chassis for layout and deployment. Its per-student
-explanation flow is not reusable and should not be carried across.
+   precision. The equivalent rule already exists for tabular release; this states
+   it for microdata and prices it.
 
 ### On "isn't this obvious?"
 

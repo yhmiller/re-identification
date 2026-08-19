@@ -33,6 +33,17 @@ attention here.
 
 ## Research questions
 
+These six are **search questions**, internal to this review. They are a tool for
+testing the gap claims and are never presented in the thesis, which carries two
+research questions. The mapping is:
+
+| Thesis question | Search questions that serve it |
+|---|---|
+| RQ1, does publishing features derived from unprotected values undermine generalisation | RQ-L1, RQ-L2, RQ-L3 |
+| RQ2, what does derivation-consistent generalisation cost, and what choices does it leave | RQ-L3, RQ-L6 |
+| Context and positioning, not framed as thesis questions | RQ-L4, RQ-L5 |
+
+
 - RQ-L1. Has the interaction between generalisation of a source variable and
   publication of features derived from that variable at original precision been
   studied empirically?

@@ -224,7 +224,12 @@ generalises nothing.
 ## 2.8 Model engineering contribution: derivation-consistent generalisation
 
 The proposed procedure implements a **Modify [M]** operation on the release step
-of the Section 2.7 baseline. 
+of the Section 2.7 baseline. The principle it applies is not new in itself:
+tabular disclosure control already requires that a perturbed table and the
+quantities derived from it be made consistent, through an additivity-restoring
+step applied after perturbation (Australian Bureau of Statistics, 2013). The
+operation defined here carries that requirement into microdata generalisation,
+where it is not standard practice. 
 
 Let **X** ∈ ℝ^{n×p} denote the source sequence matrix, g_w the elementwise
 generalisation operator of Section 2.7 at band width w, and d : ℝ^{n×p} → ℝ^{n×8}
