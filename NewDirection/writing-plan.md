@@ -16,11 +16,11 @@ yet satisfy.
 | Requirement | Source | Status |
 |---|---|---|
 | A public dataset **and** primary field data | Methods template, called non-negotiable | Done. Stage 1. |
-| Exactly one engineering operation, F/M/R/S | Methods §8 | Not framed. Reads as a study, not an artefact. |
-| Title naming the artefact, matching §8 | Methods Part 0 | Current title is a question. Mismatch is a desk-reject. |
-| Two objectives, each mapping to a subsection | Methods Part 0 | Currently six objectives. |
+| Exactly one engineering operation, F/M/R/S | Methods §8 | Done. Stage 2. `derivation_consistent.py`. |
+| Title naming the artefact, matching §8 | Methods Part 0 | Drafted, awaiting the supervisor decision. |
+| Two objectives, each mapping to a subsection | Methods Part 0 | Drafted, awaiting the supervisor decision. |
 | p-value **and** effect size on the main comparison | Results §5 | Done. Stage 3. |
-| Figures at 300 dpi or vector | Results, placement rules | No figures produced at all. |
+| Figures at 300 dpi or vector | Results, placement rules | Done. Stage 4. PNG and PDF. |
 | Training and inference timings | Results §8 | Not measured. |
 | Ethics reference number | Methods §4 | Approval granted; number not yet in any file. |
 
@@ -134,7 +134,7 @@ An earlier summary of this stage claimed that no interval crossed zero on either
 axis. That was wrong, and the correction is recorded here and in the findings
 document rather than quietly amended.
 
-## Stage 4. Figures
+## Stage 4. Figures. DONE
 
 Stage 4 is communication, not new science. Nothing here should introduce another
 layer of methodological complexity; the analysis is finished.
@@ -191,11 +191,31 @@ information pathway that substantially reverses the privacy effect of
 generalisation. Arrows implying proven identity of information would overstate
 it, and the thesis does not need that claim.
 
-## Stage 5. Methods section
+## Stage 5. Methods section. NEXT
 
 Target 1,800 to 2,200 words, 10 to 12 citations, fourteen subsections in the
 template's fixed order. Past tense for what was done, present for standing facts,
 never "I", always "we" or passive.
+
+Everything the section describes has now been run, so no subsection needs to be
+written in the future tense or left as a placeholder. Three things are still
+outstanding and each has a defined handling:
+
+| Outstanding | Handling in the draft |
+|---|---|
+| Ethics approval reference number | A visible `[REF]` marker, never a plausible-looking invented number |
+| Adviser confirmation on the fold-dependence correction | Write the method as applied and report both corrected and naive, which is true regardless of the outcome |
+| Title and two objectives | Draft against the current title. Switching later changes three places, all of them known |
+
+Four decisions from the analysis belong in the Methods and would look like
+evasions if they surfaced first in the Results:
+
+1. The utility model receives what a recipient receives, and why passing only
+   the source columns made the two arms identical by construction.
+2. The ordinary bootstrap was rejected on evidence, with the diagnostic.
+3. Equivalence testing was removed once the arms were found to differ.
+4. Attribution is measured from below because uniqueness saturates at two
+   attributes and leave-one-out returns zero everywhere.
 
 Subsections and what fills each:
 
@@ -238,7 +258,8 @@ classifier study. "Feature importance" becomes attribute identifying power, and
 "error analysis" becomes attack success and containment. Both keep the template's
 intent, which is to show where the method works and where it does not.
 
-- [ ] Measure runtimes for §8. Nothing has been timed.
+- [ ] Measure runtimes for §8. Nothing has been timed. Cheap, and the template
+      requires it.
 
 ## Stage 7. Verification
 

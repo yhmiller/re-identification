@@ -75,6 +75,23 @@ or about Ghanaian institutions rests on it. See [strata.py](strata.py).
 | Utility restored by baseline derivation | 109.8% | 99.4% | 99.5% |
 | Utility cost of closing the leak (AUC-PR) | -0.027 | -0.135 | -0.067 |
 
+### What survives formal testing
+
+Risk reduction is distinguishable from zero in **eight of nine** configurations.
+Utility cost in **six of nine**: every nursing and every public configuration,
+and none of the three allied health configurations, where corrected p values are
+0.890, 0.361 and 0.854.
+
+The allied health null is a power result at 109 modelled records, not evidence of
+no cost. Its widest interval spans [-0.087, +0.033], consistent with a cost as
+large as any observed elsewhere and equally consistent with none. The same
+corpus proved too small for generalisation to protect at all, so one sample-size
+story appears twice.
+
+Monotonicity is not claimed. Across the evaluated configurations wider
+generalisation generally produced greater risk reduction accompanied by greater
+utility loss, with two exceptions.
+
 Group size protects: Spearman **-0.893** across 11 groups of the study
 population spanning 5 to 238 students, **-0.880** across all 13 groups spanning
 5 to 423.
@@ -113,9 +130,14 @@ ml_env/bin/python notebooks/04_disclosure_risk.py              # Phases 1 and 2
 ml_env/bin/python notebooks/05_derived_feature_experiments.py  # Phase 3
 ml_env/bin/python notebooks/06_linkage_attack.py               # Phase 4
 ml_env/bin/python notebooks/07_risk_utility_frontier.py        # Phase 5
+ml_env/bin/python notebooks/08_confirmatory_tests.py           # confirmatory tests
+ml_env/bin/python figures.py                                   # figures
 ```
 
-Outputs land in `results/disclosure/`.
+Outputs land in `results/disclosure/`, figures in
+`results/disclosure/figures/`. Both are gitignored: every artefact is one
+command away, so no stale figure can drift out of step with the table it came
+from.
 
 ---
 
