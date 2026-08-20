@@ -159,8 +159,7 @@ def _header():
              stToolbar wholesale left the top-right corner dead and made the
              sidebar toggle hard to find. */
           [data-testid="stAppDeployButton"] {display: none;}
-          #MainMenu {display: none;}
-          [data-testid="stDecoration"] {display: none;}
+          
 
           /* Streamlit reveals the sidebar collapse arrow only on hover, which
              is not discoverable. Keep it visible. */
