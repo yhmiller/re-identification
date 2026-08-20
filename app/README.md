@@ -122,3 +122,7 @@ Two things sit on top of it:
 Stage 8 of the writing plan. **Optional, and scheduled last on purpose.** The
 thesis is complete and defensible without it. If the schedule slips, this is the
 first thing to drop.
+
+**[docs/app-status.md](../docs/app-status.md) is the detailed record**: every
+feature built, everything that remains, the decisions already settled so they
+are not re-opened, and the governance question blocking the upload feature.
