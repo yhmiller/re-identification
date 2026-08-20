@@ -436,6 +436,7 @@ def build_all():
         figure_frontier(),
         figure_stability(),
         figure_explanation(),
+        figure_importance(),
     ]
 
 
@@ -727,3 +728,48 @@ def figure_conceptual_framework():
     ax.text(5.0, 1.05, "measured\ntogether", ha="center", va="center",
             fontsize=8, color=MUTED, linespacing=1.4, style="italic")
     return _save(fig, "figure_1_conceptual_framework")
+
+
+def figure_importance():
+    """Figure 9. What the model relies on, under each derivation arm.
+
+    Results R6 asks where the engineered component ranks against the native
+    columns, per dataset, never averaged. The engineered component here is not a
+    feature but the source the derived block is computed from, so the question
+    becomes how much of the model's reliance the derived block carries and
+    whether changing its source moves that.
+
+    Two bars per corpus rather than a conventional importance plot, because the
+    finding is the shift between arms rather than any single ranking.
+    """
+    table = pd.read_csv(RESULTS / "interpretability_summary.csv")
+    order = ["allied_health", "nursing", "public"]
+    labels = {"allied_health": "Allied health", "nursing": "Nursing",
+              "public": "Public"}
+
+    fig, ax = plt.subplots(figsize=(7.4, 4.2))
+    width, positions = 0.36, np.arange(len(order))
+
+    for offset, mode, colour, name in (
+        (-width / 2, "baseline", BASELINE, "derived from original values"),
+        (width / 2, "proposed", PROPOSED, "derived from protected values"),
+    ):
+        shares = [
+            float(table[(table.stratum == s)
+                        & (table.derived_mode == mode)]
+                  .derived_share_of_importance.iloc[0]) * 100
+            for s in order
+        ]
+        bars = ax.bar(positions + offset, shares, width, label=name,
+                      color=colour, edgecolor="white", linewidth=0.8)
+        for bar, value in zip(bars, shares):
+            ax.text(bar.get_x() + bar.get_width() / 2, value + 1.5,
+                    f"{value:.0f}%", ha="center", fontsize=8.5, color=INK)
+
+    ax.set_xticks(positions)
+    ax.set_xticklabels([labels[s] for s in order])
+    ax.set_ylabel("Share of model importance carried\nby the derived features (%)")
+    ax.set_ylim(0, 108)
+    ax.legend(frameon=False, fontsize=8.5, loc="lower right")
+    ax.spines[["top", "right"]].set_visible(False)
+    return _save(fig, "figure_9_importance")
