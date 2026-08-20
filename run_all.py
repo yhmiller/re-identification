@@ -44,6 +44,11 @@ def main():
     import figures
     figures.build_all()
 
+    # Ends on the comparison the thesis is about, so a run answers "what did the
+    # engineered arm do against the baseline" without anyone opening a CSV.
+    import compare
+    compare.main()
+
     print(f"\n{RULE}\n  Done. Everything is in results/disclosure/\n{RULE}", flush=True)
 
 

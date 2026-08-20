@@ -63,9 +63,20 @@ def risk_comparison(stratum, band_width):
 
         return measure
 
-    return sv.subsample_difference(
+    result = sv.subsample_difference(
         uniqueness(prop), uniqueness(base), n_records=len(stratum.frame)
     )
+
+    # Record both arms, not only their difference. The utility side has always
+    # reported auc_pr_baseline and auc_pr_proposed; the risk side reported the
+    # difference alone, which meant a reader wanting the two absolute figures
+    # had to reconstruct one from the other. Reconstructing it from the
+    # post-attack uniqueness in the ablation table gives a different quantity
+    # and produced a negative proportion, which is how this was found.
+    every_record = np.arange(len(stratum.frame))
+    result["prop_unique_baseline"] = uniqueness(base)(every_record)
+    result["prop_unique_proposed"] = uniqueness(prop)(every_record)
+    return result
 
 
 def utility_comparison(stratum, band_width):
