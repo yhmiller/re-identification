@@ -82,22 +82,37 @@ to share.
 
 ---
 
-**Researcher**
-{RESEARCHER}
-[{RESEARCHER_EMAIL}](mailto:{RESEARCHER_EMAIL}) | [princemiller.com]({RESEARCHER_SITE})
-
-**Supervisor**
-{SUPERVISOR}
-
-**Institution**
-{INSTITUTION}
-{DEPARTMENT}
-{PROGRAMME}
+- **Researcher** {RESEARCHER}
+- **Contact** [{RESEARCHER_EMAIL}](mailto:{RESEARCHER_EMAIL}) | [princemiller.com]({RESEARCHER_SITE})
+- **Supervisor** {SUPERVISOR}
+- **Institution** {INSTITUTION}
+- **Department** {DEPARTMENT}
+- **Programme** {PROGRAMME}
 
 ---
 
 Decision support only. The figures are measured properties of a dataset under
 the attacks tested, not guarantees.
+"""
+
+# The ⋮ menu's About dialog is a small modal, so it gets a compact version. The
+# sidebar expander has room for the full text above.
+MENU_ABOUT_MD = f"""### {TITLE}
+
+Reports what a release of student academic records discloses, and what
+analytical value it keeps. **For the file as a whole, never for an individual
+student.**
+
+From the MSc thesis *{THESIS_TITLE}*.
+
+**{RESEARCHER}** | [{RESEARCHER_EMAIL}](mailto:{RESEARCHER_EMAIL})
+
+- **Supervisor** {SUPERVISOR}
+- **Institution** {INSTITUTION}
+- **Department** {DEPARTMENT}
+- **Programme** {PROGRAMME}
+
+Decision support only, not a guarantee.
 """
 
 VERDICT_STYLE = {
@@ -108,7 +123,45 @@ VERDICT_STYLE = {
 
 
 def _header():
-    st.set_page_config(page_title=TITLE, page_icon="🔐", layout="wide")
+    # menu_items["About"] overrides the ⋮ menu's About dialog, which otherwise
+    # reads "Made with Streamlit ... Copyright Snowflake Inc." The sidebar panel
+    # is the one most people will read, but the ⋮ dialog is the one that looks
+    # unattributed in a screenshot, so both carry the same information.
+    st.set_page_config(
+        page_title=TITLE,
+        page_icon="🔐",
+        layout="wide",
+        menu_items={
+            "Get help": f"mailto:{RESEARCHER_EMAIL}",
+            "Report a Bug": f"mailto:{RESEARCHER_EMAIL}",
+            "About": MENU_ABOUT_MD,
+        },
+    )
+    # Hide Streamlit's own toolbar. Three reasons, in order of importance.
+    #
+    # Its menu offers Developer options, Clear cache and Record a screencast,
+    # none of which a registrar needs and two of which invite trouble. The
+    # Deploy button is Streamlit Cloud marketing, and this app is meant to run
+    # inside an institution rather than be deployed to a public host. And the
+    # menu's About dialog appends "Made with Streamlit ... Copyright Snowflake
+    # Inc." beneath whatever `menu_items["About"]` supplies; that text cannot be
+    # removed through the API, only hidden, and the class names around it are
+    # build-generated hashes that change between releases.
+    #
+    # So the toolbar goes and the sidebar "About this tool" panel is the single
+    # home for attribution. `#MainMenu` is the long-documented selector and
+    # `stToolbar` the current one; both are set so a version bump degrades to a
+    # visible menu rather than a broken layout.
+    st.markdown(
+        """
+        <style>
+          #MainMenu {visibility: hidden;}
+          [data-testid="stToolbar"] {visibility: hidden; height: 0;}
+          [data-testid="stDecoration"] {display: none;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
     st.title(TITLE)
     st.caption(SUBTITLE)
     with st.sidebar:
