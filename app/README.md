@@ -94,6 +94,20 @@ up with no other change.
 All five come from `release_report.build`, which is the single function the
 writing plan asks for in Stage 8.
 
+Two things sit on top of it:
+
+- **Your options.** Every configuration for the dataset, measured the same way,
+  with the frontier marked. `release_report.sweep`. A verdict on its own tells a
+  custodian their release is unacceptable without telling them what to do
+  instead; this study's contribution is a trade-off, so the tool shows one.
+- **A downloadable assessment.** `release_report.to_markdown` renders a dated
+  document for a data-sharing request, an ethics application or a decision file.
+  It carries the configuration, both axes, the options table, the verdict with
+  its reasons and five stated limitations, and it says plainly that it records
+  an assessment rather than authorising a release. The optional assessor,
+  purpose and recipient fields are never stored; they go into the document and
+  nowhere else.
+
 ## Limits to state whenever this is demonstrated
 
 - These are **measured properties under the attacks tested**, not guarantees.

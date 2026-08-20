@@ -31,6 +31,7 @@ per-record.
 """
 
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -393,7 +394,8 @@ def _assess_tab(corpora):
     )
 
     st.divider()
-    _options_section(name, stratum, risk_threshold, utility_tolerance)
+    _options_section(name, stratum, risk_threshold, utility_tolerance,
+                     row, drivers, band, mode, suppress)
 
 
 MODE_MEANING = {
@@ -415,7 +417,8 @@ def _cached_sweep(corpus, risk_threshold, utility_tolerance):
     return table, dict(table.attrs)
 
 
-def _options_section(name, stratum, risk_threshold, utility_tolerance):
+def _options_section(name, stratum, risk_threshold, utility_tolerance,
+                     row, drivers, band, mode, suppress):
     """Every configuration for this dataset, so the verdict comes with a menu.
 
     A verdict on its own tells a custodian their release is unacceptable without
@@ -482,6 +485,9 @@ def _options_section(name, stratum, risk_threshold, utility_tolerance):
             icon="✅",
         )
 
+    _export_section(name, stratum, row, drivers, table, band, mode, suppress,
+                    risk_threshold, utility_tolerance)
+
     st.info(
         "**Reading 'features withheld' fairly.** Publishing no derived features "
         "often scores as well as publishing recomputed ones, because recomputed "
@@ -493,6 +499,55 @@ def _options_section(name, stratum, risk_threshold, utility_tolerance):
         "derived-from-protected row.",
         icon="ℹ️",
     )
+
+
+def _export_section(name, stratum, row, drivers, table, band, mode, suppress,
+                    risk_threshold, utility_tolerance):
+    """A document the custodian can attach to a decision.
+
+    The writing plan calls Phase 6 "the practical contribution": turning the
+    frontier into a written standard with worked examples. An assessment that
+    can go into an ethics application or a data-sharing file is that example.
+
+    The three optional fields exist because an assessment nobody signed is not
+    much use in a governance file. They are never stored; they go into the
+    document and nowhere else.
+    """
+    st.divider()
+    st.subheader("6. Take it away")
+    st.caption(
+        "A record of this assessment, for a data-sharing request, an ethics "
+        "application or your own decision file. Nothing you type here is "
+        "stored."
+    )
+
+    left, right = st.columns(2)
+    with left:
+        assessed_by = st.text_input("Assessed by", placeholder="Your name and role")
+        purpose = st.text_input("Purpose of release", placeholder="Why this file is being shared")
+    with right:
+        recipient = st.text_input("Intended recipient", placeholder="Who receives it")
+
+    stamped = datetime.now().strftime("%d %B %Y %H:%M")
+    report = rr.ReleaseReport(**{
+        **{k: v for k, v in row.items() if k != "reasons"},
+        "reasons": row["reasons"].split("; "),
+        "drivers": drivers,
+    })
+    document = rr.to_markdown(
+        report, sweep_table=table, assessed_by=assessed_by, purpose=purpose,
+        recipient=recipient, stamped=stamped,
+    )
+
+    st.download_button(
+        "Download this assessment (Markdown)",
+        data=document,
+        file_name=f"release-assessment-{name}-band{band:g}-{mode}.md",
+        mime="text/markdown",
+        type="primary",
+    )
+    with st.expander("Preview the document"):
+        st.markdown(document)
 
 
 # ---------------------------------------------------------------------------

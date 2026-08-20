@@ -439,3 +439,194 @@ def recommend(table):
     if acceptable.empty:
         return None
     return acceptable.sort_values("risk_reduction", ascending=False).iloc[0]
+
+
+REPORT_LIMITS = [
+    "These are measured properties of this dataset under the attacks tested. "
+    "They are not guarantees. An attacker holding information this assessment "
+    "did not simulate could do better.",
+    "Uniqueness is an upper bound on risk, not a probability of "
+    "re-identification. An adversary with imprecise knowledge does "
+    "considerably worse, by a wide margin in the corpora this method was "
+    "developed on.",
+    "The tolerances are values the assessor chose. They are not standards, and "
+    "no regulator has endorsed them.",
+    "Small cohorts cannot be protected by generalisation at any band width "
+    "tested. Where this assessment refuses every configuration for a small "
+    "group, that is the correct answer rather than a limitation of the tool.",
+    "This assessment covers disclosure from the released file alone. It does "
+    "not cover onward linkage to data the assessor does not hold.",
+]
+
+
+def to_markdown(report, sweep_table=None, assessed_by="", purpose="",
+                recipient="", stamped=None):
+    """The assessment as a document a custodian can attach to a decision.
+
+    The writing plan calls Phase 6 "the practical contribution": converting the
+    frontier into a written standard with worked examples. A report that can go
+    into an ethics application or a data-sharing file is that worked example.
+
+    `stamped` is passed in rather than read from the clock so the output is
+    reproducible and so a caller can record when the assessment was run rather
+    than when the document was rendered.
+
+    Contains no per-record content, by the same rule as everything else here.
+    The drivers table is one row per column and the frontier one row per
+    configuration.
+    """
+    when = stamped or "not recorded"
+    lines = [
+        "# Release assessment",
+        "",
+        f"**Dataset** {report.corpus}, {report.n_records} records  ",
+        f"**Assessed** {when}  ",
+    ]
+    if assessed_by:
+        lines.append(f"**Assessed by** {assessed_by}  ")
+    if purpose:
+        lines.append(f"**Purpose of release** {purpose}  ")
+    if recipient:
+        lines.append(f"**Intended recipient** {recipient}  ")
+
+    lines += [
+        "",
+        "## Verdict",
+        "",
+        f"**{report.verdict.upper()}**",
+        "",
+    ]
+    lines += [f"- {reason}" for reason in report.reasons]
+
+    lines += [
+        "",
+        "## Configuration assessed",
+        "",
+        "| Setting | Value |",
+        "|---|---|",
+        f"| Generalisation band width | {report.band_width:g} |",
+        f"| Derived features computed from | "
+        f"{'the protected values' if report.derived_mode == dc.PROPOSED else 'the original values' if report.derived_mode == dc.BASELINE else 'not published'} |",
+        f"| Suppression threshold | "
+        f"{report.suppress_k if report.suppress_k else 'none'} |",
+        f"| Risk tolerance applied | {report.risk_threshold:.0%} of records unique |",
+        f"| Utility tolerance applied | {report.utility_tolerance:.0%} of value lost |",
+        "",
+        "## What this release discloses",
+        "",
+        "| Measure | Value | Meaning |",
+        "|---|---|---|",
+        f"| Uniquely identifiable | {report.prop_unique:.1%} | "
+        "Share of records no other record matches |",
+        f"| Smallest look-alike group | {report.min_class_size} | "
+        "How many records the most exposed person hides among |",
+        f"| Prosecutor risk | {report.prosecutor_risk:.3f} | "
+        "Upper bound when the adversary knows the target is present |",
+        f"| Marketer risk | {report.marketer_risk:.3f} | "
+        "Mean risk across records, for an adversary tolerating error |",
+        f"| Below k = 5 | {report.share_below_k5:.1%} | "
+        "Share of records in groups smaller than five |",
+        "",
+        "## Leakage through derived features",
+        "",
+        f"Publishing the derived features from the original values would leave "
+        f"**{report.prop_unique_if_derived_from_originals:.1%}** of records "
+        f"uniquely identifiable, giving back **{report.leakage:.0%}** of the "
+        f"protection generalisation provides.",
+        "",
+        f"Using only what is published, an attacker could narrow "
+        f"**{report.values_pinned_exactly:.0%}** of individual source values to "
+        f"a single point.",
+        "",
+    ]
+
+    if not np.isnan(report.auc_pr_retained):
+        lines += [
+            "## Analytical value retained",
+            "",
+            "| Measure | Value |",
+            "|---|---|",
+            f"| AUC-PR on this release | {report.auc_pr:.3f} |",
+            f"| AUC-PR unprotected | {report.auc_pr_unprotected:.3f} |",
+            f"| Value retained | {report.auc_pr_retained:.0%} |",
+            f"| No-skill floor for this task | {report.prevalence:.3f} |",
+            "",
+            "The floor is what guessing would score. A release is useful when "
+            "its AUC-PR sits well above it, not merely above zero.",
+            "",
+        ]
+
+    if len(report.drivers):
+        lines += [
+            "## What drives the risk",
+            "",
+            "One row per column, not per person. Read as: if someone knew only "
+            "this column, how often would that alone single a record out.",
+            "",
+            "| Column | Distinct values | Singles out, alone |",
+            "|---|---|---|",
+        ]
+        for row in report.drivers.head(10).itertuples():
+            lines.append(
+                f"| `{row.attribute}` | {row.n_distinct_values} | "
+                f"{row.prop_unique_alone:.1%} |"
+            )
+        lines.append("")
+
+    if sweep_table is not None and len(sweep_table):
+        lines += [
+            "## Options considered",
+            "",
+            "Every configuration measured the same way. An option is on the "
+            "frontier when no other option beats it on both axes at once.",
+            "",
+            "| Band | Derived from | Unique | Risk removed | Value kept | "
+            "Frontier | Verdict |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for row in sweep_table.sort_values(
+            ["band_width", "derived_mode"]
+        ).itertuples():
+            kept = (
+                "n/a" if np.isnan(row.auc_pr_retained)
+                else f"{row.auc_pr_retained:.0%}"
+            )
+            lines.append(
+                f"| {row.band_width:g} | {row.derived_mode} | "
+                f"{row.prop_unique:.1%} | {row.risk_reduction:.0%} | {kept} | "
+                f"{'yes' if row.on_frontier else ''} | {row.verdict} |"
+            )
+        lines.append("")
+
+    lines += ["## Limitations", ""]
+    lines += [f"{n}. {text}" for n, text in enumerate(REPORT_LIMITS, 1)]
+
+    lines += [
+        "",
+        "## Method",
+        "",
+        "Disclosure risk is measured as the share of records unique on the "
+        "released columns, with the standard k-anonymity family reported "
+        "alongside. Analytical value is measured by fitting a gradient-boosted "
+        "tree model to exactly what a recipient receives and comparing its "
+        "AUC-PR against the same model on the unprotected release.",
+        "",
+        "The single decision this assessment turns on is whether features "
+        "derived from a generalised variable are computed from the original "
+        "values or from the protected ones. Computing them from the protected "
+        "values means a recipient can recompute them from the columns already "
+        "published, so they disclose nothing further. Computing them from the "
+        "originals means they constrain the generalised values back towards "
+        "the numbers the generalisation was applied to hide.",
+        "",
+        "Produced by the Release Risk Advisor, from the MSc thesis "
+        "*Derivation-Consistent De-identification of Health Professions "
+        "Education Records: Disclosure Risk and Analytical Utility Under "
+        "Hybrid Public and Institutional Academic Data* "
+        "(Prince Bortey Miller, KNUST, supervised by Dr. Eric Opoku Osei).",
+        "",
+        "Decision support only. This document records an assessment; it does "
+        "not authorise a release.",
+        "",
+    ]
+    return "\n".join(lines)
