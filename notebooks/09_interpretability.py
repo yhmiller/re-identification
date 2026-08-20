@@ -53,24 +53,20 @@ EXPLAIN_TEST_FRACTION = 0.25
 
 
 def _release_matrix(stratum, band_width, mode):
-    """Exactly what the utility model receives, and its column names.
+    """What the utility model receives, and its column names.
 
-    Mirrors risk_utility.frontier_row so the explanation describes the model
-    the study actually evaluated, rather than a second model fitted here.
+    Delegates to risk_utility.release_matrix so the explanation describes the
+    release the study evaluated rather than a second reconstruction of it.
     """
-    frame, predictors = stratum.frame, stratum.predictors
-    release = dc.build(frame, stratum.sequence, band_width, None, mode)
-    features = release.frame[predictors]
-
-    if release.mode != dc.NONE:
-        origin = frame if release.mode == dc.BASELINE else release.frame
-        derived = di.derive_features(origin, predictors)
-        informative = [c for c in derived.columns if derived[c].nunique() > 1]
-        features = features.join(derived[informative])
-
-    usable = features.join(frame[[st.SENSITIVE]]).dropna()
-    columns = [c for c in usable.columns if c != st.SENSITIVE]
-    return usable[columns], usable[st.SENSITIVE].astype(int), columns
+    X, y, columns = ru.release_matrix(
+        stratum.frame,
+        stratum.sequence,
+        stratum.predictors,
+        st.SENSITIVE,
+        band_width=band_width,
+        derived_mode=mode,
+    )
+    return X, y.astype(int), columns
 
 
 def explain(stratum, band_width, mode):

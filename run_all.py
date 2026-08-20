@@ -25,6 +25,7 @@ STAGES = [
     ("07_risk_utility_frontier.py", "Risk and utility across both derivation arms"),
     ("08_confirmatory_tests.py", "Pre-specified confirmatory comparisons"),
     ("09_interpretability.py", "SHAP importance under each derivation arm"),
+    ("10_error_and_curves.py", "Curves, fold scores, error profiles and cost"),
 ]
 
 RULE = "=" * 78

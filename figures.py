@@ -135,7 +135,7 @@ def figure_mechanism():
 
     axes[0].set_ylabel("Records uniquely identifiable", fontsize=9.5)
     axes[0].yaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
-    return _save(fig, "figure_5_mechanism")
+    return _save(fig, "figure_s1_mechanism")
 
 
 def figure_frontier():
@@ -203,10 +203,10 @@ def figure_frontier():
     second = ax.legend(handles=fill_keys, fontsize=8, frameon=False,
                        loc="lower center", title="Release", title_fontsize=8.5)
     second._legend_box.align = "left"
-    return _save(fig, "figure_6_frontier")
+    return _save(fig, "figure_7_frontier")
 
 
-def figure_stability():
+def figure_fold_differences():
     """Distribution of the paired per-fold utility differences.
 
     Shows that the effect is not one convenient average, and shows equally that
@@ -299,7 +299,7 @@ def figure_stability():
         ),
     ]
     ax.legend(handles=handles, fontsize=8, frameon=False, loc="lower right")
-    return _save(fig, "figure_7_stability")
+    return _save(fig, "figure_s2_fold_differences")
 
 
 def figure_explanation():
@@ -420,7 +420,7 @@ def figure_explanation():
         color="#6B7075",
         linespacing=1.5,
     )
-    return _save(fig, "figure_8_explanation")
+    return _save(fig, "figure_10_explanation")
 
 
 def build_all():
@@ -432,11 +432,21 @@ def build_all():
         figure_baseline_vs_proposed(),
         algorithm_box(),
         table_1_corpora(),
-        figure_mechanism(),
+        # Results tables, generated so the manuscript never transcribes them.
+        table_5_main_comparison(),
+        table_6_statistical(),
+        # Results, Figures 5 to 9, in manuscript order.
+        figure_pr_curves(),
+        figure_fold_distribution(),
         figure_frontier(),
-        figure_stability(),
-        figure_explanation(),
         figure_importance(),
+        figure_confusion(),
+        # Discussion.
+        figure_explanation(),
+        # Supplementary. Displaced from the main section by the eight-item cap,
+        # not by being uninformative.
+        figure_mechanism(),
+        figure_fold_differences(),
     ]
 
 
@@ -772,4 +782,285 @@ def figure_importance():
     ax.set_ylim(0, 108)
     ax.legend(frameon=False, fontsize=8.5, loc="lower right")
     ax.spines[["top", "right"]].set_visible(False)
-    return _save(fig, "figure_9_importance")
+    return _save(fig, "figure_8_importance")
+
+
+
+def _modelled_label(corpus, errors):
+    """Corpus label carrying the number of records actually modelled.
+
+    CORPUS_LABEL quotes the corpus size. Listwise deletion on the predictor set
+    means the utility model sees fewer, so a curve or a confusion matrix titled
+    with the corpus size overstates its own denominator.
+    """
+    base = CORPUS_LABEL[corpus].split(" (")[0]
+    row = errors[errors.stratum == corpus]
+    if row.empty:
+        return CORPUS_LABEL[corpus]
+    return f"{base} (n={int(row.iloc[0].n_records)})"
+
+
+def figure_pr_curves():
+    """R2. Precision-recall curves for both arms, one panel per corpus.
+
+    Curves come from the averaged out-of-fold probabilities of stage 10, so the
+    curve and the AUC-PR in Table 5 describe the same predictions. The no-skill
+    floor is drawn on each panel because a precision-recall curve read against
+    zero rather than against prevalence overstates every model on it.
+    """
+    curves = pd.read_csv(RESULTS / "pr_curves.csv")
+    summary = pd.read_csv(RESULTS / "fold_summary.csv")
+    errors = pd.read_csv(RESULTS / "error_profile.csv")
+
+    corpora = [c for c in CORPUS_LABEL if c in set(curves.stratum)]
+    fig, axes = plt.subplots(1, len(corpora), figsize=(4.0 * len(corpora), 3.8))
+    axes = np.atleast_1d(axes)
+
+    for ax, corpus in zip(axes, corpora):
+        _style(ax)
+        for mode, colour, style in (
+            ("baseline", BASELINE, "--"),
+            ("proposed", PROPOSED, "-"),
+        ):
+            sub = curves[(curves.stratum == corpus) & (curves.derived_mode == mode)]
+            score = summary[
+                (summary.stratum == corpus) & (summary.derived_mode == mode)
+            ]
+            label = mode.capitalize()
+            if not score.empty:
+                label += f" (AUC-PR {score.iloc[0].auc_pr_mean:.3f})"
+            ax.plot(sub.recall, sub.precision, style, color=colour,
+                    linewidth=1.8, label=label, zorder=3)
+
+        row = errors[errors.stratum == corpus]
+        if not row.empty:
+            floor = row.iloc[0].support_positive / row.iloc[0].n_records
+            ax.axhline(floor, color=NEUTRAL, linewidth=1.0, linestyle=":",
+                       zorder=2)
+            ax.text(0.02, floor + 0.02, f"no-skill floor {floor:.3f}",
+                    fontsize=7.5, color="#5A6066")
+
+        ax.set_title(_modelled_label(corpus, errors), fontsize=9.5,
+                     color="#3A3F44")
+        ax.set_xlabel("Recall", fontsize=9)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1.02)
+        ax.legend(fontsize=7.5, frameon=False, loc="lower left")
+
+    axes[0].set_ylabel("Precision", fontsize=9)
+    fig.tight_layout()
+    return _save(fig, "figure_5_pr_curves")
+
+
+def figure_fold_distribution():
+    """R3. Per-fold AUC-PR for each arm, with every fold drawn.
+
+    The template asks for the metric itself per arm rather than the paired
+    difference, so a reader can see the two distributions and their overlap.
+    The paired differences, which are what the confirmatory test operates on,
+    are the supplementary fold-difference figure.
+    """
+    folds = pd.read_csv(RESULTS / "fold_scores.csv")
+    errors = pd.read_csv(RESULTS / "error_profile.csv")
+    fig, ax = plt.subplots(figsize=(8.6, 4.4))
+    _style(ax)
+
+    rng = np.random.default_rng(ru_seed())
+    positions, labels, data, colours = [], [], [], []
+    pos = 0
+    for corpus in CORPUS_LABEL:
+        sub = folds[folds.stratum == corpus]
+        if sub.empty:
+            continue
+        for mode, colour in (("baseline", BASELINE), ("proposed", PROPOSED)):
+            values = sub[sub.derived_mode == mode].auc_pr.to_numpy()
+            data.append(values)
+            positions.append(pos)
+            labels.append(mode.capitalize())
+            colours.append(colour)
+            pos += 1
+        pos += 0.9
+
+    box = ax.boxplot(data, positions=positions, widths=0.6, patch_artist=True,
+                     medianprops=dict(color="white", linewidth=1.4),
+                     flierprops=dict(marker="", linestyle="none"), zorder=2)
+    for patch, colour in zip(box["boxes"], colours):
+        patch.set_facecolor(colour)
+        patch.set_alpha(0.75)
+        patch.set_edgecolor(colour)
+
+    # Every fold drawn, jittered so overlapping folds remain countable.
+    for values, position in zip(data, positions):
+        jitter = rng.uniform(-0.16, 0.16, size=len(values))
+        ax.plot(position + jitter, values, "o", markersize=2.6,
+                color="#2B2F33", alpha=0.65, zorder=4)
+
+    for values, position in zip(data, positions):
+        ax.text(position, values.max() + 0.028,
+                f"{values.mean():.3f}\n±{values.std(ddof=1):.3f}",
+                ha="center", fontsize=7, color="#3A3F44")
+
+    ax.set_xticks(positions)
+    ax.set_xticklabels(labels, fontsize=8)
+    ax.set_ylabel("AUC-PR per fold", fontsize=9)
+    ax.set_ylim(min(v.min() for v in data) - 0.06,
+                max(v.max() for v in data) + 0.10)
+
+    centres = [np.mean(positions[i:i + 2]) for i in range(0, len(positions), 2)]
+    present = [c for c in CORPUS_LABEL if c in set(folds.stratum)]
+    for centre, corpus in zip(centres, present):
+        ax.text(centre, ax.get_ylim()[0] + 0.012,
+                _modelled_label(corpus, errors),
+                ha="center", fontsize=8.5, color="#3A3F44")
+
+    fig.tight_layout()
+    return _save(fig, "figure_6_fold_distribution")
+
+
+def figure_confusion():
+    """R7. Confusion matrices for both arms, normalised by true class.
+
+    Normalised by row, so each cell is the share of an actual class that landed
+    in a predicted class and the two corpora of different size can be read on
+    the same scale. Raw counts are printed beneath each proportion, since a
+    proportion over a small class hides how few records produced it.
+    """
+    errors = pd.read_csv(RESULTS / "error_profile.csv")
+    corpora = [c for c in CORPUS_LABEL if c in set(errors.stratum)]
+
+    fig, axes = plt.subplots(2, len(corpora),
+                             figsize=(2.9 * len(corpora), 5.6))
+    axes = np.atleast_2d(axes)
+
+    for column, corpus in enumerate(corpora):
+        for row_index, mode in enumerate(("baseline", "proposed")):
+            ax = axes[row_index][column]
+            row = errors[(errors.stratum == corpus)
+                         & (errors.derived_mode == mode)]
+            if row.empty:
+                ax.axis("off")
+                continue
+            r = row.iloc[0]
+            counts = np.array([[r.true_negative, r.false_positive],
+                               [r.false_negative, r.true_positive]], dtype=float)
+            shares = counts / counts.sum(axis=1, keepdims=True)
+
+            ax.imshow(shares, cmap="Greens", vmin=0, vmax=1)
+            for i in range(2):
+                for j in range(2):
+                    ax.text(j, i, f"{shares[i, j]:.2f}\n({int(counts[i, j])})",
+                            ha="center", va="center", fontsize=8.5,
+                            color="white" if shares[i, j] > 0.55 else "#2B2F33")
+            ax.set_xticks([0, 1])
+            ax.set_yticks([0, 1])
+            ax.set_xticklabels(["Not weak", "Weak"], fontsize=7.5)
+            ax.set_yticklabels(["Not weak", "Weak"], fontsize=7.5)
+            ax.grid(False)
+            if row_index == 0:
+                ax.set_title(_modelled_label(corpus, errors), fontsize=9,
+                             color="#3A3F44")
+            if column == 0:
+                ax.set_ylabel(f"{mode.capitalize()}\nActual", fontsize=8.5)
+            if row_index == 1:
+                ax.set_xlabel("Predicted", fontsize=8.5)
+
+    fig.tight_layout()
+    return _save(fig, "figure_9_confusion")
+
+
+def ru_seed():
+    """The figure jitter must not move between runs."""
+    import risk_utility
+    return risk_utility.BASE_SEED
+
+
+def table_5_main_comparison():
+    """R2's main comparison table, generated from the frontier.
+
+    Written out rather than typed into the manuscript. The AUC-ROC column of an
+    earlier hand-built version of this table was wrong in every row, which is
+    what generating it prevents.
+    """
+    frontier = pd.read_csv(RESULTS / "risk_utility_frontier.csv")
+    bands = {"allied_health": 0.5, "nursing": 0.5, "public": 2.5}
+    order = [
+        ("original, no protection", "Unprotected"),
+        ("none", "Generalised, no derived features"),
+        ("baseline", "Generalised + baseline derivation"),
+        ("proposed", "Generalised + proposed derivation"),
+    ]
+
+    lines = [
+        "| Corpus | Release | Unique | Δ unique | AUC-PR (mean ± SD) | Δ AUC-PR | AUC-ROC |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for corpus, band in bands.items():
+        rows = {}
+        for _, row in frontier[frontier.stratum == corpus].iterrows():
+            if row.config == "original, no protection":
+                rows["original, no protection"] = row
+            elif row.suppress_k == 0 and row.band_width == band:
+                rows[row.derived_mode] = row
+
+        baseline, proposed = rows.get("baseline"), rows.get("proposed")
+        label = CORPUS_LABEL[corpus].split(" (")[0]
+        for key, description in order:
+            row = rows.get(key)
+            if row is None:
+                continue
+            delta_u = delta_p = ""
+            if key == "proposed" and baseline is not None:
+                delta_u = (
+                    f"**{(proposed.prop_unique - baseline.prop_unique) * 100:+.1f} pp**"
+                )
+                delta_p = f"**{proposed.auc_pr - baseline.auc_pr:+.3f}**"
+            lines.append(
+                f"| {label if key == order[0][0] else ''} | {description} "
+                f"| {row.prop_unique * 100:.1f}% | {delta_u} "
+                f"| {row.auc_pr:.3f} ± {row.auc_pr_sd:.3f} | {delta_p} "
+                f"| {row.auc_roc:.3f} |"
+            )
+
+    path = RESULTS / "table_5_main_comparison.md"
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def table_6_statistical():
+    """R4's confirmatory comparison table, generated from the two stat files.
+
+    Risk and utility comparisons live in separate outputs and were previously
+    merged by hand into the manuscript, which is where five of the nine effect
+    sizes went wrong.
+    """
+    risk = pd.read_csv(RESULTS / "confirmatory_risk.csv")
+    utility = pd.read_csv(RESULTS / "confirmatory_utility.csv")
+    merged = risk.merge(utility, on=["stratum", "band_width"],
+                        suffixes=("_risk", "_utility"))
+
+    def interval(low, high):
+        return f"[{low:+.3f}, {high:+.3f}]".replace("+0.000", "0.000")
+
+    lines = [
+        "| Corpus | Band | Risk difference | 95% CI | Utility difference "
+        "| 95% CI, corrected | p, corrected | d_z |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for corpus in CORPUS_LABEL:
+        sub = merged[merged.stratum == corpus].sort_values("band_width")
+        label = CORPUS_LABEL[corpus].split(" (")[0]
+        for position, row in enumerate(sub.itertuples()):
+            p = row.corrected_p
+            printed = "<0.0001" if p < 0.0001 else f"{p:.4f}".rstrip("0")
+            lines.append(
+                f"| {label if position == 0 else ''} | {row.band_width:.2f} "
+                f"| {row.difference_full_corpus:+.3f} "
+                f"| {interval(row.ci_low, row.ci_high)} "
+                f"| {row.mean_difference:+.3f} "
+                f"| {interval(row.corrected_ci_low, row.corrected_ci_high)} "
+                f"| {printed} | {row.cohens_d:+.2f} |"
+            )
+
+    path = RESULTS / "table_6_statistical.md"
+    path.write_text("\n".join(lines) + "\n")
+    return path

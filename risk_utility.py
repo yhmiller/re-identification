@@ -106,6 +106,29 @@ def apply_release(frame, semester_cols, band_width, suppress_k, derived_mode):
     return release.frame, release.records_suppressed
 
 
+def release_matrix(frame, semester_cols, predictors, target, band_width=None,
+                   suppress_k=None, derived_mode="none"):
+    """The feature matrix and labels a recipient of this release could model.
+
+    Extracted so every stage that scores a release builds it the same way. A
+    second implementation is how the two arms end up differing in something
+    other than the derivation source.
+    """
+    release = dc.build(frame, semester_cols, band_width, suppress_k, derived_mode)
+    released = release.frame
+
+    features = released[predictors]
+    if release.mode != dc.NONE:
+        origin = frame if release.mode == dc.BASELINE else released
+        derived = di.derive_features(origin, predictors)
+        informative = [c for c in derived.columns if derived[c].nunique() > 1]
+        features = features.join(derived[informative])
+
+    usable = features.join(frame[[target]]).dropna()
+    columns = [c for c in usable.columns if c != target]
+    return usable[columns], usable[target], columns
+
+
 def frontier_row(
     frame,
     semester_cols,
