@@ -48,9 +48,57 @@ import strata as strata_module  # noqa: E402
 
 TITLE = "Release Risk Advisor"
 SUBTITLE = "What this release discloses, and what analytical value it keeps"
+
 RESEARCHER = "Prince Bortey Miller"
+RESEARCHER_EMAIL = "prince@princemiller.com"
+RESEARCHER_SITE = "https://www.princemiller.com"
 SUPERVISOR = "Dr. Eric Opoku Osei"
-INSTITUTION = "KNUST, MSc Health Informatics, 2026"
+INSTITUTION = "Kwame Nkrumah University of Science and Technology"
+DEPARTMENT = "Department of Computer Science"
+PROGRAMME = "MSc Health Informatics, 2026"
+
+THESIS_TITLE = (
+    "Derivation-Consistent De-identification of Health Professions Education "
+    "Records: Disclosure Risk and Analytical Utility Under Hybrid Public and "
+    "Institutional Academic Data"
+)
+
+ABOUT_MD = f"""### {TITLE}
+
+Decision support for releasing a dataset of student academic records. It reports
+what a release discloses and what analytical value it keeps, **for the file as a
+whole and never for an individual student**.
+
+Built from the MSc thesis:
+
+> *{THESIS_TITLE}*
+
+The thesis shows that removing names and index numbers does not anonymise an
+academic transcript, that blurring grades is undone by publishing summary
+features computed from the unblurred values, and that computing those features
+from the protected values instead holds the protection at a measured cost in
+analytical utility. This tool prices that trade-off for a dataset you are about
+to share.
+
+---
+
+**Researcher**
+{RESEARCHER}
+[{RESEARCHER_EMAIL}](mailto:{RESEARCHER_EMAIL}) | [princemiller.com]({RESEARCHER_SITE})
+
+**Supervisor**
+{SUPERVISOR}
+
+**Institution**
+{INSTITUTION}
+{DEPARTMENT}
+{PROGRAMME}
+
+---
+
+Decision support only. The figures are measured properties of a dataset under
+the attacks tested, not guarantees.
+"""
 
 VERDICT_STYLE = {
     rr.VERDICT_RELEASE: ("✅", "success"),
@@ -70,7 +118,15 @@ def _header():
             "file as a whole and never on an individual record."
         )
         st.divider()
-        st.markdown(f"**{RESEARCHER}**  \n{INSTITUTION}  \nSupervisor: {SUPERVISOR}")
+        st.markdown(
+            f"**{RESEARCHER}**  \n"
+            f"[{RESEARCHER_EMAIL}](mailto:{RESEARCHER_EMAIL})  \n"
+            f"{PROGRAMME}  \n"
+            f"Supervisor: {SUPERVISOR}"
+        )
+        with st.expander("About this tool"):
+            st.markdown(ABOUT_MD)
+        st.caption(f"Made by {RESEARCHER} | {INSTITUTION}")
 
 
 def _no_individual_output_notice():

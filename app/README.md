@@ -1,8 +1,13 @@
 # Release Risk Advisor
 
 ```bash
-ml_env/bin/streamlit run app/app.py
+./app.sh              # default port 8501
+./app.sh 8600         # a specific port
 ```
+
+`app.sh` sets up the Python environment on first run, the same way `run.sh`
+does, and warns before opening if `results/disclosure/` is empty so the Study
+findings tab does not just look broken.
 
 Decision support for someone about to **share a dataset** of student academic
 records. It answers one question: *if I release it this way, what am I exposing
