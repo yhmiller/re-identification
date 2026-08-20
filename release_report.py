@@ -131,9 +131,7 @@ def _values_pinned(frame, sequence, band_width):
     lo, hi, summary = am.reconstruct(banded, sequence, low, high, derived)
     # truth is the sequence columns only; passing the whole frame breaks on
     # any non-numeric column, which the public corpus has.
-    metrics = am.recovery_metrics(
-        lo, hi, summary, band_width, truth=frame[sequence]
-    )
+    metrics = am.recovery_metrics(lo, hi, summary, band_width, truth=frame[sequence])
     return float(metrics["prop_values_recovered_exactly"])
 
 
@@ -292,3 +290,152 @@ def plain_english(report):
 
     lines.append(f"Verdict: {report.verdict}. " + "; ".join(report.reasons) + ".")
     return lines
+
+
+def _is_dominated(candidate, others):
+    """One configuration is dominated if another beats it on both axes.
+
+    Same definition the study uses in notebook 07: another configuration cuts at
+    least as much risk while keeping at least as much utility, and strictly beats
+    it on one of the two. Dominated configurations are never the right choice, so
+    what remains is the frontier a custodian picks from.
+    """
+    return any(
+        other["risk_reduction"] >= candidate["risk_reduction"]
+        and other["auc_pr_retained"] >= candidate["auc_pr_retained"]
+        and (
+            other["risk_reduction"] > candidate["risk_reduction"]
+            or other["auc_pr_retained"] > candidate["auc_pr_retained"]
+        )
+        for other in others
+        if other is not candidate
+    )
+
+
+def sweep(
+    frame,
+    sequence,
+    predictors,
+    target,
+    corpus="dataset",
+    band_widths=(),
+    modes=(dc.PROPOSED, dc.BASELINE, dc.NONE),
+    suppress_k=None,
+    risk_threshold=DEFAULT_RISK_THRESHOLD,
+    utility_tolerance=DEFAULT_UTILITY_TOLERANCE,
+    with_utility=True,
+    progress=None,
+):
+    """Every configuration for one dataset, with the frontier marked.
+
+    A single verdict tells a custodian their release is unacceptable without
+    telling them what to do instead. The contribution of this study is a
+    trade-off with a menu, so the tool should show the menu.
+
+    The unprotected release is measured once rather than once per configuration.
+    `release_report.build` recomputes it every call, which is correct in
+    isolation and wasteful across a sweep: it roughly halves the time here.
+
+    `progress` is an optional callable taking (done, total) so a caller can
+    report progress without this module importing an interface library.
+    """
+    rows = []
+    unprotected_auc = np.nan
+    prevalence = np.nan
+
+    if with_utility:
+        unprotected = ru.frontier_row(
+            frame,
+            sequence,
+            predictors,
+            target,
+            "unprotected",
+            derived_mode=dc.NONE,
+        )
+        unprotected_auc = unprotected["auc_pr"]
+        prevalence = unprotected["prevalence"]
+
+    total = len(band_widths) * len(modes)
+    done = 0
+
+    for band_width in band_widths:
+        for mode in modes:
+            release = dc.build(frame, sequence, band_width, suppress_k, mode)
+            profile = dr.risk_profile(release.frame, release.visible_columns)
+
+            if with_utility:
+                protected = ru.frontier_row(
+                    frame,
+                    sequence,
+                    predictors,
+                    target,
+                    "protected",
+                    band_width=band_width,
+                    suppress_k=suppress_k,
+                    derived_mode=mode,
+                )
+                auc_pr = protected["auc_pr"]
+                retained = (
+                    auc_pr / unprotected_auc
+                    if unprotected_auc and not np.isnan(unprotected_auc)
+                    else np.nan
+                )
+            else:
+                auc_pr = retained = np.nan
+
+            verdict, reasons = _decide(
+                profile.prop_unique, retained, risk_threshold, utility_tolerance
+            )
+            rows.append(
+                {
+                    "corpus": corpus,
+                    "band_width": float(band_width),
+                    "derived_mode": release.mode,
+                    "prop_unique": profile.prop_unique,
+                    "min_class_size": profile.min_class_size,
+                    "auc_pr": auc_pr,
+                    "auc_pr_retained": retained,
+                    "verdict": verdict,
+                    "reasons": "; ".join(reasons),
+                }
+            )
+
+            done += 1
+            if progress is not None:
+                progress(done, total)
+
+    table = pd.DataFrame(rows)
+
+    # Risk reduction is measured against the unprotected release, so the two
+    # axes point the same way: higher is better on both.
+    unprotected_unique = dr.risk_profile(frame, sequence).prop_unique
+    table["risk_reduction"] = (
+        (unprotected_unique - table.prop_unique) / unprotected_unique
+        if unprotected_unique > 0
+        else 0.0
+    )
+
+    if with_utility and table.auc_pr_retained.notna().any():
+        records = table.to_dict("records")
+        table["on_frontier"] = [not _is_dominated(r, records) for r in records]
+    else:
+        table["on_frontier"] = False
+
+    table.attrs["unprotected_auc_pr"] = unprotected_auc
+    table.attrs["unprotected_prop_unique"] = unprotected_unique
+    table.attrs["prevalence"] = prevalence
+    return table
+
+
+def recommend(table):
+    """The frontier configuration that passes on both tolerances, if any.
+
+    Prefers the largest risk reduction among acceptable options, because a
+    custodian asking this question is protecting data, not maximising a model.
+    Returns None when nothing on the frontier is acceptable, which is a real
+    answer rather than a failure: on the smallest corpora, nothing is.
+    """
+    acceptable = table[(table.verdict == VERDICT_RELEASE) & table.on_frontier]
+    if acceptable.empty:
+        return None
+    return acceptable.sort_values("risk_reduction", ascending=False).iloc[0]

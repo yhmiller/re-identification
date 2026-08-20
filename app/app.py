@@ -159,7 +159,11 @@ def _header():
              stToolbar wholesale left the top-right corner dead and made the
              sidebar toggle hard to find. */
           [data-testid="stAppDeployButton"] {display: none;}
-          
+          /* Both selectors on purpose. The bare id is the pre-1.40
+             convention and matches nothing current; the test id is what
+             Streamlit 1.40 actually renders. */
+          #MainMenu, [data-testid="stMainMenu"] {display: none;}
+          [data-testid="stDecoration"] {display: none;}
 
           /* Streamlit reveals the sidebar collapse arrow only on hover, which
              is not discoverable. Keep it visible. */
@@ -386,6 +390,108 @@ def _assess_tab(corpora):
         "**What this is not.** These are measured properties of this dataset "
         "under the attacks tested, not a guarantee. An attacker with "
         "information this study did not simulate could do better."
+    )
+
+    st.divider()
+    _options_section(name, stratum, risk_threshold, utility_tolerance)
+
+
+MODE_MEANING = {
+    dc.PROPOSED: "derived from protected values",
+    dc.BASELINE: "derived from original values",
+    dc.NONE: "features withheld",
+}
+
+
+@st.cache_data(show_spinner=False)
+def _cached_sweep(corpus, risk_threshold, utility_tolerance):
+    stratum = strata_module.LOADERS[corpus]()
+    table = rr.sweep(
+        stratum.frame, stratum.sequence, stratum.predictors,
+        strata_module.SENSITIVE, corpus=corpus,
+        band_widths=stratum.band_widths,
+        risk_threshold=risk_threshold, utility_tolerance=utility_tolerance,
+    )
+    return table, dict(table.attrs)
+
+
+def _options_section(name, stratum, risk_threshold, utility_tolerance):
+    """Every configuration for this dataset, so the verdict comes with a menu.
+
+    A verdict on its own tells a custodian their release is unacceptable without
+    telling them what to do instead. This study's contribution is a trade-off,
+    so the tool shows the trade-off.
+    """
+    st.subheader("5. Your options")
+    st.caption(
+        "Every configuration for this dataset, measured the same way. "
+        "**On the frontier** marks the options no other option beats on both "
+        "axes at once; anything else is a strictly worse choice."
+    )
+
+    with st.spinner("Measuring every configuration. This takes about half a "
+                    "minute the first time, then it is cached."):
+        table, meta = _cached_sweep(name, risk_threshold, utility_tolerance)
+
+    chart = pd.DataFrame({
+        "Risk removed": table.risk_reduction,
+        "Analytical value kept": table.auc_pr_retained,
+        "Option": [
+            f"band {r.band_width:g}, {MODE_MEANING[r.derived_mode]}"
+            for r in table.itertuples()
+        ],
+        "On the frontier": table.on_frontier.map(
+            {True: "on the frontier", False: "beaten by another option"}),
+    })
+    st.scatter_chart(
+        chart, x="Risk removed", y="Analytical value kept",
+        color="On the frontier", size=None,
+    )
+    st.caption(
+        "Top-right is better on both axes. The unprotected release sits at "
+        f"0% risk removed and 100% value kept, by definition."
+    )
+
+    view = pd.DataFrame({
+        "Band": table.band_width,
+        "Derived features": table.derived_mode.map(MODE_MEANING),
+        "Uniquely identifiable": table.prop_unique.map("{:.1%}".format),
+        "Risk removed": table.risk_reduction.map("{:.0%}".format),
+        "Value kept": table.auc_pr_retained.map("{:.0%}".format),
+        "On the frontier": table.on_frontier.map({True: "yes", False: ""}),
+        "Verdict": table.verdict,
+    }).sort_values(["Band", "Derived features"])
+    st.dataframe(view, use_container_width=True, hide_index=True)
+
+    best = rr.recommend(table)
+    if best is None:
+        st.warning(
+            "**No configuration meets both tolerances.** Loosen one of them, or "
+            "accept that this dataset cannot be released at this size. On the "
+            "smallest cohorts that is the correct answer rather than a failure "
+            "of the tool.",
+            icon="⚠️",
+        )
+    else:
+        st.success(
+            f"**Suggested: band {best.band_width:g}, "
+            f"{MODE_MEANING[best.derived_mode]}.** It removes "
+            f"{best.risk_reduction:.0%} of the disclosure risk and keeps "
+            f"{best.auc_pr_retained:.0%} of the analytical value, and no other "
+            f"option beats it on both.",
+            icon="✅",
+        )
+
+    st.info(
+        "**Reading 'features withheld' fairly.** Publishing no derived features "
+        "often scores as well as publishing recomputed ones, because recomputed "
+        "features carry little the banded columns do not already carry. That is "
+        "a real result, not a bug. But it is not a like-for-like choice: "
+        "withholding them means your analysts do not receive the summaries they "
+        "asked for. The decision this study is about is how to publish them if "
+        "you are going to, which is the baseline row against the "
+        "derived-from-protected row.",
+        icon="ℹ️",
     )
 
 
