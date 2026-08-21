@@ -433,8 +433,11 @@ def build_all():
         algorithm_box(),
         table_1_corpora(),
         # Results tables, generated so the manuscript never transcribes them.
-        table_5_main_comparison(),
-        table_6_statistical(),
+        table_10_main_comparison(),
+        table_11_column_survival(),
+        table_12_statistical(),
+        table_13_reconstruction(),
+        table_14_error_exchange(),
         # Results, Figures 5 to 9, in manuscript order.
         figure_pr_curves(),
         figure_fold_distribution(),
@@ -974,7 +977,7 @@ def ru_seed():
     return risk_utility.BASE_SEED
 
 
-def table_5_main_comparison():
+def table_10_main_comparison():
     """R2's main comparison table, generated from the frontier.
 
     Written out rather than typed into the manuscript. The AUC-ROC column of an
@@ -1021,12 +1024,12 @@ def table_5_main_comparison():
                 f"| {row.auc_roc:.3f} |"
             )
 
-    path = RESULTS / "table_5_main_comparison.md"
+    path = RESULTS / "table_10_main_comparison.md"
     path.write_text("\n".join(lines) + "\n")
     return path
 
 
-def table_6_statistical():
+def table_12_statistical():
     """R4's confirmatory comparison table, generated from the two stat files.
 
     Risk and utility comparisons live in separate outputs and were previously
@@ -1061,6 +1064,109 @@ def table_6_statistical():
                 f"| {printed} | {row.cohens_d:+.2f} |"
             )
 
-    path = RESULTS / "table_6_statistical.md"
+    path = RESULTS / "table_12_statistical.md"
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def table_13_reconstruction():
+    """R5's reconstruction table, generated, with both risk quantities shown.
+
+    The hand-built predecessor carried a column headed "After reversion" holding
+    `prop_unique_after_attack`, which is what an adversary recovers from
+    reconstructed point estimates. A reader took it for the baseline release's
+    own uniqueness, which is a different number, and four apparent
+    cross-table discrepancies followed. Both quantities are now printed side by
+    side under names that distinguish them.
+    """
+    recon = pd.read_csv(RESULTS / "experiment_b_reconstruction.csv")
+    risk = pd.read_csv(RESULTS / "confirmatory_risk.csv")
+    merged = recon.merge(
+        risk[["stratum", "band_width", "prop_unique_baseline"]],
+        on=["stratum", "band_width"], how="left")
+
+    lines = [
+        "| Corpus | Band | Unprotected | Generalised, no derived block "
+        "| Baseline release, as published | Recovered by the attack "
+        "| Protection reversed | Source values recovered exactly |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for corpus in CORPUS_LABEL:
+        sub = merged[merged.stratum == corpus].sort_values("band_width")
+        label = CORPUS_LABEL[corpus].split(" (")[0]
+        for position, row in enumerate(sub.itertuples()):
+            lines.append(
+                f"| {label if position == 0 else ''} | {row.band_width:.2f} "
+                f"| {row.prop_unique_original * 100:.1f}% "
+                f"| {row.prop_unique_after_generalisation * 100:.1f}% "
+                f"| {row.prop_unique_baseline * 100:.1f}% "
+                f"| {row.prop_unique_after_attack * 100:.1f}% "
+                f"| {row.protection_reversed * 100:.1f}% "
+                f"| {row.prop_values_recovered_exactly * 100:.1f}% |"
+            )
+    path = RESULTS / "table_13_reconstruction.md"
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def table_14_error_exchange():
+    """R7's error-profile exchange, in stakeholder units.
+
+    Methods M15 declares the false negative the costlier error and the false
+    positive a review that finds nothing. This table applies that declaration to
+    the measured counts, which is the translation the metric alone does not make.
+    """
+    errors = pd.read_csv(RESULTS / "error_profile.csv")
+    lines = [
+        "| Corpus | False negatives, baseline → proposed | Struggling students "
+        "additionally reached | False positives, baseline → proposed "
+        "| Extra reviews finding nothing | Reviews per additional student reached |",
+        "|---|---|---|---|---|---|",
+    ]
+    for corpus in CORPUS_LABEL:
+        sub = errors[errors.stratum == corpus].set_index("derived_mode")
+        if not {"baseline", "proposed"} <= set(sub.index):
+            continue
+        base, prop = sub.loc["baseline"], sub.loc["proposed"]
+        reached = int(base.false_negative - prop.false_negative)
+        extra = int(prop.false_positive - base.false_positive)
+        ratio = f"{extra / reached:.1f}" if reached else "not defined"
+        lines.append(
+            f"| {CORPUS_LABEL[corpus].split(' (')[0]} "
+            f"| {int(base.false_negative)} → {int(prop.false_negative)} | {reached} "
+            f"| {int(base.false_positive)} → {int(prop.false_positive)} | {extra} "
+            f"| {ratio} |")
+    path = RESULTS / "table_14_error_exchange.md"
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def table_11_column_survival():
+    """Per-arm derived-column survival, the GATE-2 condition.
+
+    The single-distinct-value filter of M7 holds the feature set constant across
+    folds but cannot hold it constant across arms, because a column derived from
+    banded values can collapse where the same column at full precision does not.
+    Whether it actually did is a fact, and this is the fact.
+    """
+    frontier = pd.read_csv(RESULTS / "risk_utility_frontier.csv")
+    arms = frontier[(frontier.suppress_k == 0)
+                    & (frontier.derived_mode.isin(["baseline", "proposed"]))]
+    lines = ["| Corpus | Band | Source columns | Derived columns, baseline "
+             "| Derived columns, proposed | Identical |",
+             "|---|---|---|---|---|---|"]
+    for corpus in CORPUS_LABEL:
+        sub = arms[arms.stratum == corpus]
+        source = frontier[(frontier.stratum == corpus)
+                          & (frontier.derived_mode == "none")].n_features.iloc[0]
+        label = CORPUS_LABEL[corpus].split(" (")[0]
+        for position, band in enumerate(sorted(sub.band_width.unique())):
+            row = sub[sub.band_width == band]
+            b = int(row[row.derived_mode == "baseline"].n_features.iloc[0]) - int(source)
+            p = int(row[row.derived_mode == "proposed"].n_features.iloc[0]) - int(source)
+            lines.append(
+                f"| {label if position == 0 else ''} | {band:.2f} | {int(source)} "
+                f"| {b} of 8 | {p} of 8 | {'yes' if b == p else '**no**'} |")
+    path = RESULTS / "table_11_column_survival.md"
     path.write_text("\n".join(lines) + "\n")
     return path

@@ -186,7 +186,7 @@ Analysis complete. Methods and Results drafted. Four sections still to write.
 - [x] Title and two objectives adopted. The marking scheme closed the question
 - [x] Scoping literature search run, and its findings propagated to every
       document that carried the superseded novelty claim
-- [ ] **Ethics approval reference number.** `CHRPE/AP/XXX/26` caps the marking
+- [ ] **Ethics approval reference number.** `HuSSREC/CS/XXX/26` caps the marking
       scheme at 70% against a 90% pass. The single highest-value action left
 - [x] Read the sources marked critical in `docs/literature/sources.md`. Done 19
       August 2026. Nine sources, read in full. Two wrong author attributions
