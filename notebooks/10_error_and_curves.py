@@ -91,7 +91,7 @@ def _fit_and_score(X, y):
     # One column per repetition, so a record's five out-of-fold predictions can
     # be averaged without assuming which fold produced which.
     probabilities = np.full((len(y), ru.N_CV_REPEATS), np.nan)
-    folds, fit_times, predict_times = [], [], []
+    folds, fit_times, fit_cpu, predict_times = [], [], [], []
 
     # One discarded fit first. Without it the first timed fit carries XGBoost's
     # one-off setup and inflates the mean for whichever arm happens to run
@@ -105,9 +105,15 @@ def _fit_and_score(X, y):
         repeat = index // ru.N_CV_FOLDS
 
         model = XGBClassifier(**ru.XGB_PARAMS, random_state=ru.BASE_SEED)
-        started = time.perf_counter()
+        # Wall clock and CPU time both recorded. Wall clock is what a user
+        # waits and is what R9 quotes for scale, but it is dominated by whatever
+        # else the machine is doing: the same fit has measured 0.10 s and 0.49 s
+        # on this hardware. CPU time counts cycles actually spent and is the
+        # stable quantity, so it is what any comparison between arms uses.
+        started, started_cpu = time.perf_counter(), time.process_time()
         model.fit(X[train_idx], y[train_idx])
         fit_times.append(time.perf_counter() - started)
+        fit_cpu.append(time.process_time() - started_cpu)
 
         started = time.perf_counter()
         proba = model.predict_proba(X[test_idx])[:, 1]
@@ -129,6 +135,7 @@ def _fit_and_score(X, y):
         "mean_proba": np.nanmean(probabilities, axis=1),
         "folds": pd.DataFrame(folds),
         "fit_seconds": np.array(fit_times),
+        "fit_cpu_seconds": np.array(fit_cpu),
         "predict_seconds_per_instance": float(np.mean(predict_times)),
         # tracemalloc sees Python allocations only. XGBoost allocates its
         # tree structures in C++, so this is a floor on the true footprint and
@@ -296,6 +303,8 @@ def main():
                     "n_fits": len(scored["fit_seconds"]),
                     "fit_seconds_mean": float(scored["fit_seconds"].mean()),
                     "fit_seconds_sd": float(scored["fit_seconds"].std(ddof=1)),
+                    "fit_cpu_mean": float(scored["fit_cpu_seconds"].mean()),
+                    "fit_cpu_sd": float(scored["fit_cpu_seconds"].std(ddof=1)),
                     "predict_ms_per_instance": (
                         scored["predict_seconds_per_instance"] * 1000
                     ),
