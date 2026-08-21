@@ -45,6 +45,26 @@ Modes
 `BASELINE`  derive from the originals, publish at original precision. This is
             what pipelines do today, and it is the arm the ablation reverts to
 `PROPOSED`  derive from the generalised values. The contribution
+`SELECTIVE` derive only the arithmetically constraining features from the
+            generalised values, leaving the rest at original precision
+
+Why SELECTIVE exists
+--------------------
+Table 5 of the manuscript partitions the eight derived features by whether each
+constrains the source values arithmetically. Only five do, and only those five
+enter the interval propagation the reconstruction attack uses. A release that
+recomputes those five from the protected values, while leaving `gpa_trend`,
+`gpa_consistency` and `n_weak_semesters` at original precision, therefore closes
+the arithmetic pathway while keeping three features the attack cannot exploit
+directly.
+
+Whether that holds is a measurement, not an assumption, and there is a specific
+reason to doubt it. The "does not constrain" classification was derived on the
+assumption that the whole block shares one derivation source. Under a mixed
+source it need not survive: `gpa_trend` at original precision is the exact
+difference between two source values, and combined with their published bands it
+pins the pair to a one-dimensional family. The containment and recovery checks
+are run against this arm for that reason.
 """
 
 from dataclasses import dataclass, field
@@ -56,8 +76,9 @@ import deidentify as di
 NONE = "none"
 BASELINE = "baseline"
 PROPOSED = "proposed"
+SELECTIVE = "selective"
 
-MODES = (NONE, BASELINE, PROPOSED)
+MODES = (NONE, BASELINE, PROPOSED, SELECTIVE)
 
 # The findings document and the earlier notebooks used descriptive names for the
 # two derived modes. Kept so older result files remain readable.
@@ -96,7 +117,9 @@ def build(frame, source_columns, band_width=None, suppress_k=None, mode=PROPOSED
         2. Suppress records whose equivalence class falls below suppress_k.
         3. Derive the engineered features.
            [MODIFY] from the generalised frame under PROPOSED,
-                    from the original frame under BASELINE.
+                    from the original frame under BASELINE,
+                    from both under SELECTIVE, split by Table 5's
+                    constraining classification.
         4. Join and return.
 
     Only step 3 differs between the two arms. Steps 1, 2 and 4 are identical, so
@@ -117,7 +140,20 @@ def build(frame, source_columns, band_width=None, suppress_k=None, mode=PROPOSED
         released, suppressed = di.suppress(released, source_columns, suppress_k)
 
     derived_columns = []
-    if mode != NONE:
+    if mode == SELECTIVE:
+        # Constraining features from the protected values, the rest from the
+        # originals. Both blocks are computed over the same columns, so the
+        # published schema is identical to the other arms.
+        protected = di.derive_features(released, source_columns)
+        original = di.derive_features(frame, source_columns)
+        free = [c for c in original.columns if c not in di.CONSTRAINING_COLUMNS]
+        derived = protected[
+            [c for c in protected.columns if c in di.CONSTRAINING_COLUMNS]
+        ].join(original[free])
+        derived = derived[list(original.columns)]
+        released = released.drop(columns=derived.columns, errors="ignore").join(derived)
+        derived_columns = list(derived.columns)
+    elif mode != NONE:
         origin = frame if mode == BASELINE else released
         derived = di.derive_features(origin, source_columns)
         released = released.drop(columns=derived.columns, errors="ignore").join(derived)
@@ -132,6 +168,11 @@ def build(frame, source_columns, band_width=None, suppress_k=None, mode=PROPOSED
         source_columns=list(source_columns),
         derived_columns=derived_columns,
     )
+
+
+def selective(frame, source_columns, band_width=None, suppress_k=None):
+    """Constraining features from protected values, the rest from originals."""
+    return build(frame, source_columns, band_width, suppress_k, mode=SELECTIVE)
 
 
 def baseline(frame, source_columns, band_width=None, suppress_k=None):

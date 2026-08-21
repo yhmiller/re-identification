@@ -26,6 +26,8 @@ STAGES = [
     ("08_confirmatory_tests.py", "Pre-specified confirmatory comparisons"),
     ("09_interpretability.py", "SHAP importance under each derivation arm"),
     ("10_error_and_curves.py", "Curves, fold scores, error profiles and cost"),
+    ("11_gate_remediation.py", "Four release arms, suppression sweep, dominance"),
+    ("12_robustness.py", "Seed, threshold and quasi-identifier sensitivity"),
 ]
 
 RULE = "=" * 78

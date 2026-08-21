@@ -106,6 +106,32 @@ def apply_release(frame, semester_cols, band_width, suppress_k, derived_mode):
     return release.frame, release.records_suppressed
 
 
+def derived_block(frame, released, predictors, mode):
+    """The derived block a recipient models, over the predictor positions only.
+
+    Deliberately not taken from `release.frame`: the release derives over the
+    whole sequence, which includes the final observed position the sensitive
+    attribute comes from, so modelling that block would leak the target. This
+    recomputes over the predictors with the same source rule the release used.
+
+    One function serves both call sites so the mode rule exists once. An earlier
+    attempt to read the block off the release instead produced an AUC-PR of
+    1.000, which is what target leakage looks like.
+    """
+    if mode == dc.NONE:
+        return None
+    if mode == dc.SELECTIVE:
+        protected = di.derive_features(released, predictors)
+        original = di.derive_features(frame, predictors)
+        free = [c for c in original.columns if c not in di.CONSTRAINING_COLUMNS]
+        block = protected[
+            [c for c in protected.columns if c in di.CONSTRAINING_COLUMNS]
+        ].join(original[free])
+        return block[list(original.columns)]
+    origin = frame if mode == dc.BASELINE else released
+    return di.derive_features(origin, predictors)
+
+
 def release_matrix(frame, semester_cols, predictors, target, band_width=None,
                    suppress_k=None, derived_mode="none"):
     """The feature matrix and labels a recipient of this release could model.
@@ -118,9 +144,8 @@ def release_matrix(frame, semester_cols, predictors, target, band_width=None,
     released = release.frame
 
     features = released[predictors]
-    if release.mode != dc.NONE:
-        origin = frame if release.mode == dc.BASELINE else released
-        derived = di.derive_features(origin, predictors)
+    derived = derived_block(frame, released, predictors, release.mode)
+    if derived is not None:
         informative = [c for c in derived.columns if derived[c].nunique() > 1]
         features = features.join(derived[informative])
 
@@ -144,7 +169,8 @@ def frontier_row(
     release = dc.build(frame, semester_cols, band_width, suppress_k, derived_mode)
     released, suppressed = release.frame, release.records_suppressed
 
-    risk = dr.risk_profile(released, release.visible_columns)
+    risk = dr.risk_profile(released, release.visible_columns,
+                           sensitive=target)
 
     # Utility uses what the recipient actually receives: the generalised
     # predictor columns plus the derived features published alongside them.
@@ -159,9 +185,8 @@ def frontier_row(
     # position, so deriving over the full sequence would leak the target into the
     # features.
     features = released[predictors]
-    if release.mode != dc.NONE:
-        origin = frame if release.mode == dc.BASELINE else released
-        derived = di.derive_features(origin, predictors)
+    derived = derived_block(frame, released, predictors, release.mode)
+    if derived is not None:
         informative = [c for c in derived.columns if derived[c].nunique() > 1]
         features = features.join(derived[informative])
 
@@ -195,5 +220,8 @@ def frontier_row(
         "prop_unique": risk.prop_unique,
         "min_class_size": risk.min_class_size,
         "marketer_risk": risk.marketer_risk,
+        "prosecutor_risk": risk.prosecutor_risk,
+        "min_l_diversity": risk.min_l_diversity,
+        "max_t_closeness": risk.max_t_closeness,
         **utility,
     }

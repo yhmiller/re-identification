@@ -420,7 +420,7 @@ def figure_explanation():
         color="#6B7075",
         linespacing=1.5,
     )
-    return _save(fig, "figure_10_explanation")
+    return _save(fig, "figure_11_explanation")
 
 
 def build_all():
@@ -436,12 +436,16 @@ def build_all():
         table_10_main_comparison(),
         table_11_column_survival(),
         table_12_statistical(),
-        table_13_reconstruction(),
-        table_14_error_exchange(),
+        table_13_threshold_check(),
+        table_14_reconstruction(),
+        table_15_arm_sweep(),
+        table_16_suppression(),
+        table_17_error_exchange(),
         # Results, Figures 5 to 9, in manuscript order.
         figure_pr_curves(),
         figure_fold_distribution(),
         figure_frontier(),
+        figure_arm_frontier(),
         figure_importance(),
         figure_confusion(),
         # Discussion.
@@ -785,7 +789,7 @@ def figure_importance():
     ax.set_ylim(0, 108)
     ax.legend(frameon=False, fontsize=8.5, loc="lower right")
     ax.spines[["top", "right"]].set_visible(False)
-    return _save(fig, "figure_8_importance")
+    return _save(fig, "figure_9_importance")
 
 
 
@@ -968,7 +972,7 @@ def figure_confusion():
                 ax.set_xlabel("Predicted", fontsize=8.5)
 
     fig.tight_layout()
-    return _save(fig, "figure_9_confusion")
+    return _save(fig, "figure_10_confusion")
 
 
 def ru_seed():
@@ -1069,7 +1073,7 @@ def table_12_statistical():
     return path
 
 
-def table_13_reconstruction():
+def table_14_reconstruction():
     """R5's reconstruction table, generated, with both risk quantities shown.
 
     The hand-built predecessor carried a column headed "After reversion" holding
@@ -1104,12 +1108,12 @@ def table_13_reconstruction():
                 f"| {row.protection_reversed * 100:.1f}% "
                 f"| {row.prop_values_recovered_exactly * 100:.1f}% |"
             )
-    path = RESULTS / "table_13_reconstruction.md"
+    path = RESULTS / "table_14_reconstruction.md"
     path.write_text("\n".join(lines) + "\n")
     return path
 
 
-def table_14_error_exchange():
+def table_17_error_exchange():
     """R7's error-profile exchange, in stakeholder units.
 
     Methods M15 declares the false negative the costlier error and the false
@@ -1136,7 +1140,7 @@ def table_14_error_exchange():
             f"| {int(base.false_negative)} → {int(prop.false_negative)} | {reached} "
             f"| {int(base.false_positive)} → {int(prop.false_positive)} | {extra} "
             f"| {ratio} |")
-    path = RESULTS / "table_14_error_exchange.md"
+    path = RESULTS / "table_17_error_exchange.md"
     path.write_text("\n".join(lines) + "\n")
     return path
 
@@ -1168,5 +1172,155 @@ def table_11_column_survival():
                 f"| {label if position == 0 else ''} | {band:.2f} | {int(source)} "
                 f"| {b} of 8 | {p} of 8 | {'yes' if b == p else '**no**'} |")
     path = RESULTS / "table_11_column_survival.md"
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+SELECTIVE_COLOUR = "#B26B2E"
+
+
+def figure_arm_frontier():
+    """Every release arm on the risk-utility plane, per corpus.
+
+    The three-arm version could not show what GATE-4 turns on, because the
+    withhold arm and the proposed arm plot at the same risk and the reader has
+    to read two sections to notice. Four arms on one plane makes dominance
+    visible: a point with another point above and to its left is dominated.
+    """
+    sweep = pd.read_csv(RESULTS / "arm_sweep.csv")
+    sweep = sweep[(sweep.suppress_k == 0) & sweep.auc_pr.notna()]
+    corpora = [c for c in CORPUS_LABEL if c in set(sweep.stratum)]
+
+    style = {
+        "none": (NEUTRAL, "o", "Withhold the derived block"),
+        "baseline": (BASELINE, "s", "Baseline derivation"),
+        "proposed": (PROPOSED, "^", "Proposed derivation"),
+        "selective": (SELECTIVE_COLOUR, "D", "Selective derivation"),
+    }
+
+    fig, axes = plt.subplots(1, len(corpora), figsize=(4.3 * len(corpora), 4.0))
+    axes = np.atleast_1d(axes)
+    for ax, corpus in zip(axes, corpora):
+        _style(ax)
+        sub = sweep[sweep.stratum == corpus]
+        for mode, (colour, marker, label) in style.items():
+            arm = sub[sub.derived_mode == mode]
+            ax.plot(arm.prop_unique * 100, arm.auc_pr, marker, color=colour,
+                    markersize=7, linestyle="", label=label, zorder=3,
+                    markeredgecolor="white", markeredgewidth=0.7)
+        modelled = int(sub.n_modelled.max())
+        ax.set_title(f"{CORPUS_LABEL[corpus].split(' (')[0]} (n={modelled})",
+                     fontsize=9.5, color="#3A3F44")
+        ax.set_xlabel("Records unique in the release (%)", fontsize=9)
+        ax.set_xlim(-4, 104)
+    axes[0].set_ylabel("AUC-PR retained", fontsize=9)
+    axes[0].legend(fontsize=7.5, frameon=False, loc="lower left")
+    fig.tight_layout()
+    return _save(fig, "figure_8_arm_frontier")
+
+
+def table_15_arm_sweep():
+    """R5's four-arm comparison at the middle band, with the full metric set.
+
+    Answers two findings at once: the study declared six risk metrics in Table 7
+    and reported one, and it evaluated three release arms where its own feature
+    table implies a fourth.
+    """
+    sweep = pd.read_csv(RESULTS / "arm_sweep.csv")
+    label = {"none": "Withhold the derived block",
+             "baseline": "Baseline derivation",
+             "proposed": "Proposed derivation",
+             "selective": "Selective derivation"}
+    middle = {"allied_health": 0.5, "nursing": 0.5, "public": 2.5}
+
+    lines = ["| Corpus | Release | Unique | Min k | Marketer risk | l-diversity "
+             "| t-closeness | AUC-PR |",
+             "|---|---|---|---|---|---|---|---|"]
+    for corpus in CORPUS_LABEL:
+        sub = sweep[(sweep.stratum == corpus)
+                    & (sweep.band_width == middle[corpus])
+                    & (sweep.suppress_k == 0)]
+        name = CORPUS_LABEL[corpus].split(" (")[0]
+        for position, mode in enumerate(["none", "baseline", "proposed", "selective"]):
+            row = sub[sub.derived_mode == mode]
+            if row.empty:
+                continue
+            r = row.iloc[0]
+            lines.append(
+                f"| {name if position == 0 else ''} | {label[mode]} "
+                f"| {r.prop_unique * 100:.1f}% | {int(r.min_class_size)} "
+                f"| {r.marketer_risk:.3f} | {int(r.min_l_diversity)} "
+                f"| {r.max_t_closeness:.3f} | {r.auc_pr:.3f} |")
+    path = RESULTS / "table_15_arm_sweep.md"
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def table_16_suppression():
+    """R5's suppression sweep. Suppression is the lever a custodian reaches for
+    when banding alone cannot reach a k-anonymity target, and the study declared
+    three thresholds while reporting none of them."""
+    sweep = pd.read_csv(RESULTS / "arm_sweep.csv")
+    middle = {"allied_health": 0.5, "nursing": 0.5, "public": 2.5}
+    label = {"none": "Withhold", "baseline": "Baseline",
+             "proposed": "Proposed", "selective": "Selective"}
+
+    lines = ["| Corpus | k | Records suppressed | Release | Unique | AUC-PR |",
+             "|---|---|---|---|---|---|"]
+    for corpus in CORPUS_LABEL:
+        name = CORPUS_LABEL[corpus].split(" (")[0]
+        first = True
+        for k in (0, 3, 5):
+            sub = sweep[(sweep.stratum == corpus)
+                        & (sweep.band_width == middle[corpus])
+                        & (sweep.suppress_k == k)]
+            for position, mode in enumerate(["none", "baseline", "proposed", "selective"]):
+                row = sub[sub.derived_mode == mode]
+                if row.empty:
+                    continue
+                r = row.iloc[0]
+                score = "not evaluable" if pd.isna(r.auc_pr) else f"{r.auc_pr:.3f}"
+                lines.append(
+                    f"| {name if first else ''} | {k if position == 0 else ''} "
+                    f"| {int(r.records_suppressed) if position == 0 else ''} "
+                    f"| {label[mode]} | {r.prop_unique * 100:.1f}% | {score} |")
+                first = False
+    path = RESULTS / "table_16_suppression.md"
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def table_13_threshold_check():
+    """R4's leakage check on the outcome threshold.
+
+    The corpus-wide quantile of M8 lets a test-fold label depend on training-fold
+    values, which is the one operation in the pipeline that crosses the fold
+    boundary. This is the same comparison run with the cut recomputed inside each
+    training fold.
+    """
+    fold = pd.read_csv(RESULTS / "fold_internal_threshold.csv")
+    corpus = pd.read_csv(RESULTS / "confirmatory_utility.csv")
+    merged = fold.merge(
+        corpus[["stratum", "band_width", "mean_difference", "corrected_p"]],
+        on=["stratum", "band_width"], suffixes=("_fold", "_corpus"))
+
+    lines = ["| Corpus | Band | Difference, corpus-wide cut | Difference, "
+             "fold-internal cut | p, corpus-wide | p, fold-internal | Verdict |",
+             "|---|---|---|---|---|---|---|"]
+    for name in CORPUS_LABEL:
+        sub = merged[merged.stratum == name].sort_values("band_width")
+        label = CORPUS_LABEL[name].split(" (")[0]
+        for position, row in enumerate(sub.itertuples()):
+            same = ((row.corrected_p_fold < 0.05) ==
+                    (row.corrected_p_corpus < 0.05))
+            printed = lambda p: "<0.0001" if p < 0.0001 else f"{p:.4f}"
+            lines.append(
+                f"| {label if position == 0 else ''} | {row.band_width:.2f} "
+                f"| {row.mean_difference_corpus:+.4f} "
+                f"| {row.mean_difference_fold:+.4f} "
+                f"| {printed(row.corrected_p_corpus)} "
+                f"| {printed(row.corrected_p_fold)} "
+                f"| {'unchanged' if same else '**CHANGED**'} |")
+    path = RESULTS / "table_13_threshold_check.md"
     path.write_text("\n".join(lines) + "\n")
     return path
