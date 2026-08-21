@@ -160,6 +160,44 @@ def _error_profile(y, proba):
     }
 
 
+def _band_edge_profile(stratum, band, y, proba, mode):
+    """Q21.2. How far the misclassified sit from the nearest band boundary.
+
+    The examination's hypothesis: the proposed arm's extra false positives are
+    records whose true grades sit near a band edge, where banding displaces them
+    across the weak threshold and the displacement then propagates into every
+    derived column at once.
+
+    Emitted as group means only. Per-record distances are never written out; the
+    aggregate-only rule that governs every other output governs this one.
+    """
+    predicted = (proba >= ERROR_THRESHOLD).astype(int)
+    grades = stratum.frame[stratum.predictors].reindex(
+        stratum.frame.index).to_numpy(dtype=float)
+    # Distance to the nearest band edge, averaged over a record's predictors.
+    offset = np.mod(grades, band)
+    distance = np.nanmean(np.minimum(offset, band - offset), axis=1)
+    distance = distance[: len(y)]
+
+    groups = {
+        "false positive": (y == 0) & (predicted == 1),
+        "true negative": (y == 0) & (predicted == 0),
+        "false negative": (y == 1) & (predicted == 0),
+        "true positive": (y == 1) & (predicted == 1),
+    }
+    rows = []
+    for label, mask in groups.items():
+        selected = distance[mask]
+        rows.append({
+            "derived_mode": mode, "outcome_group": label,
+            "n": int(mask.sum()),
+            "mean_distance_to_band_edge": (
+                float(np.nanmean(selected)) if mask.sum() else np.nan),
+            "band_width": band,
+        })
+    return rows
+
+
 def _check_against_stage_08(rows):
     """The per-fold means here must reproduce the confirmatory stage's means.
 
@@ -194,6 +232,7 @@ def _check_against_stage_08(rows):
 
 def main():
     fold_rows, error_rows, curve_rows, cost_rows, summary = [], [], [], [], []
+    edge_rows = []
 
     for name, stratum in st.load_all().items():
         band = stratum.band_widths[1]
@@ -242,6 +281,12 @@ def main():
                     }
                 )
             )
+
+            edge_rows.extend([
+                {"stratum": name, **row}
+                for row in _band_edge_profile(
+                    stratum, band, scored["y"], scored["mean_proba"], mode)
+            ])
 
             cost_rows.append(
                 {
@@ -314,7 +359,8 @@ def main():
     cost["process_peak_rss_mb"] = round(peak_rss_mb, 1)
     cost.to_csv(RESULTS / "compute_cost.csv", index=False)
     pd.DataFrame(summary).to_csv(RESULTS / "fold_summary.csv", index=False)
-    print(f"wrote 6 tables to {RESULTS.relative_to(ROOT)}/")
+    pd.DataFrame(edge_rows).to_csv(RESULTS / "band_edge_profile.csv", index=False)
+    print(f"wrote 7 tables to {RESULTS.relative_to(ROOT)}/")
 
 
 if __name__ == "__main__":
