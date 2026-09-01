@@ -24,7 +24,7 @@ No function here returns record-level output. Everything is aggregate by
 construction, so no re-identified student can leave this module.
 """
 
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, asdict
 
 import numpy as np
 import pandas as pd
@@ -294,36 +294,6 @@ def saturation_curve(frame, candidates, precision=None, max_size=6):
         if best_prop >= 1.0:
             break
     return pd.DataFrame(rows)
-
-
-def minimum_attribute_sets(frame, candidates, precision=None, max_size=3, target=1.0):
-    """Smallest attribute combinations that reach `target` uniqueness.
-
-    Answers the question an examiner will ask directly: how few things does
-    somebody need to know about a student before they can find that student's
-    row. Searches combinations up to `max_size`, stopping at the first size
-    that reaches the target so the search stays tractable.
-    """
-    from itertools import combinations
-
-    candidates = [c for c in candidates if c in frame.columns]
-    found = []
-    for size in range(1, max_size + 1):
-        for combo in combinations(candidates, size):
-            prop = float(
-                (equivalence_class_sizes(frame, list(combo), precision) == 1).mean()
-            )
-            if prop >= target:
-                found.append(
-                    {
-                        "n_attributes": size,
-                        "attributes": ", ".join(combo),
-                        "prop_unique": prop,
-                    }
-                )
-        if found:
-            break
-    return pd.DataFrame(found)
 
 
 def group_size_effect(frame, quasi_identifiers, group_cols, precision=None):

@@ -32,7 +32,6 @@ sys.path.insert(0, str(ROOT))
 
 import derivation_consistent as dc  # noqa: E402
 import disclosure_risk as dr  # noqa: E402
-import deidentify as di  # noqa: E402
 import risk_utility as ru  # noqa: E402
 import stats_validation as sv  # noqa: E402
 import strata as st  # noqa: E402

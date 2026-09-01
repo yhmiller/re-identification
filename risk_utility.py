@@ -22,7 +22,6 @@ does not use would cost nothing and prove nothing.
 """
 
 import numpy as np
-import pandas as pd
 from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.model_selection import RepeatedStratifiedKFold
 from xgboost import XGBClassifier
@@ -93,17 +92,6 @@ def cross_validated_utility(X, y, seed=BASE_SEED, return_folds=False):
         out["fold_auc_roc"] = roc_scores
         out["fold_auc_pr"] = pr_scores
     return out
-
-
-def apply_release(frame, semester_cols, band_width, suppress_k, derived_mode):
-    """Build the file a custodian would hand out.
-
-    Delegates to `derivation_consistent.build`, which is the engineered
-    artefact. Kept as a thin wrapper so the frontier code reads in the same
-    shape it always did.
-    """
-    release = dc.build(frame, semester_cols, band_width, suppress_k, derived_mode)
-    return release.frame, release.records_suppressed
 
 
 def derived_block(frame, released, predictors, mode):

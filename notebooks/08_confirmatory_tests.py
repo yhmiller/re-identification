@@ -31,7 +31,6 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-import deidentify as di  # noqa: E402
 import derivation_consistent as dc  # noqa: E402
 import disclosure_risk as dr  # noqa: E402
 import risk_utility as ru  # noqa: E402

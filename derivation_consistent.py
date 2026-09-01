@@ -132,11 +132,6 @@ def build(frame, source_columns, band_width=None, suppress_k=None, mode=PROPOSED
     )
 
 
-def selective(frame, source_columns, band_width=None, suppress_k=None):
-    """Constraining features from protected values, the rest from originals."""
-    return build(frame, source_columns, band_width, suppress_k, mode=SELECTIVE)
-
-
 def baseline(frame, source_columns, band_width=None, suppress_k=None):
     """Standard generalisation: derived features computed from the originals."""
     return build(frame, source_columns, band_width, suppress_k, mode=BASELINE)
