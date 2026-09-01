@@ -90,9 +90,9 @@ def main():
                 continue
             rr = rr.iloc[0]
 
-            # Both arms are recorded directly. An earlier version added the
-            # difference to the ablation table's post-attack uniqueness, which
-            # is a different quantity, and produced a negative proportion.
+            # Both arms are read directly rather than reconstructed from a
+            # difference: the ablation table's post-attack uniqueness is a
+            # different quantity.
             print(
                 f"  {ur.band_width:>5g}  {rr.prop_unique_baseline:>9.3f} "
                 f"{rr.prop_unique_proposed:>11.3f} "

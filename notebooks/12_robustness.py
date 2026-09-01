@@ -1,19 +1,18 @@
-"""Stage 12. Robustness axes the examination found claimed but unreported.
+"""Stage 12. Sensitivity of the arm comparison to choices held fixed elsewhere.
 
-Four items, each answering a specific finding:
+Four axes, each answering a way the headline comparison could be an artefact of
+one unvaried decision:
 
-    G1.1  the outcome threshold recomputed within each training fold rather
-          than across the corpus, so the one operation that crosses the fold
-          boundary can be shown not to change any verdict
-    Q8.1  the nine configurations re-run at two further root seeds, since every
-          fold assignment and every tree ensemble in the study descends from
-          seed 42 and fold variance is not seed variance
-    Q8.3  a reduced quasi-identifier configuration per corpus, since the whole
-          analysis rests on one unvaried choice and quasi-identifier selection
-          is the largest single lever on uniqueness
-    Q14.3 the minimum detectable difference for allied health, so its three
-          null results can be reported as a power statement rather than as
-          evidence of no effect
+    the outcome threshold recomputed within each training fold rather than
+    across the corpus, since a corpus-wide quantile lets a test-fold label
+    depend on training-fold values
+    the nine configurations re-run at two further root seeds, since every fold
+    assignment and every ensemble descends from one seed and fold variance is
+    not seed variance
+    a reduced quasi-identifier configuration per corpus, since quasi-identifier
+    selection is the largest single lever on uniqueness
+    the minimum detectable difference per configuration, so a non-significant
+    result can be read as a statement about resolution rather than about effect
 
 Run:
     ml_env/bin/python notebooks/12_robustness.py

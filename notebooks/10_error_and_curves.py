@@ -3,10 +3,10 @@
 The CAN-DO ML-RESULTS template requires four things the earlier stages do not
 produce:
 
-    R2  precision-recall curves for both arms on the same axes
-    R3  the primary metric per fold for each arm, not only their difference
-    R7  normalised confusion matrices, per-class scores and error counts
-    R9  training time per fold, inference time and peak memory
+    precision-recall curves for both arms on the same axes
+    the primary metric per fold for each arm, not only their difference
+    normalised confusion matrices, per-class scores and error counts
+    training time per fold, inference time and peak memory
 
 **On timing.** Wall-clock measurements do not reproduce exactly between runs, so
 `compute_cost.csv` is the one output of this pipeline that is not byte-identical
@@ -21,7 +21,8 @@ the same fitted models. `_check_against_stage_08` asserts that rather than
 assuming it.
 
 **On the threshold.** Methods M15 reports AUC-PR and AUC-ROC, both rank-based,
-and applies no decision threshold to anything. R7 cannot be written without one:
+and applies no decision threshold to anything. An error profile cannot be
+formed without one:
 a confusion matrix is a thresholded object. A fixed 0.5 is therefore applied
 here, identically to both arms, **for the error profile only**. No metric
 reported anywhere else in the study depends on it, and M15 declares it.
@@ -65,7 +66,7 @@ import strata as st  # noqa: E402
 RESULTS = ROOT / "results" / "disclosure"
 RESULTS.mkdir(parents=True, exist_ok=True)
 
-# Applied to both arms, for the R7 error profile only. Declared in Methods M15.
+# Applied to both arms, for the error profile only. Declared in Methods M15.
 ERROR_THRESHOLD = 0.5
 
 # One curve per corpus would be unreadable at nine band widths, so the reported
@@ -106,7 +107,7 @@ def _fit_and_score(X, y):
 
         model = XGBClassifier(**ru.XGB_PARAMS, random_state=ru.BASE_SEED)
         # Wall clock and CPU time both recorded. Wall clock is what a user
-        # waits and is what R9 quotes for scale, but it is dominated by whatever
+        # waits and fixes the scale, but it is dominated by whatever
         # else the machine is doing: the same fit has measured 0.10 s and 0.49 s
         # on this hardware. CPU time counts cycles actually spent and is the
         # stable quantity, so it is what any comparison between arms uses.

@@ -233,22 +233,14 @@ def cohens_d_paired(a_vals, b_vals):
     return float(diff.mean() / sd_diff) if sd_diff > 0 else 0.0
 
 
-# ---------------------------------------------------------------------------
-# Confirmatory analysis for the disclosure-risk study
-# ---------------------------------------------------------------------------
+# The two confirmatory comparisons differ in construction because their units of
+# independence differ: risk is a property of a set, so records are resampled;
+# utility comes from cross-validation, so folds are paired and their dependence
+# is corrected rather than resampled away.
 #
-# Two comparisons, deliberately different in construction because the units of
-# independence differ.
-#
-# Risk is a property of a set of records, so records are resampled.
-# Utility is estimated by cross-validation, so the folds are paired and the
-# dependence between them is handled rather than resampled away.
-#
-# Neither effect size is standardised. Both metrics are bounded and directly
-# interpretable, and dividing by a variance that repeated cross-validation makes
-# ambiguous would import the dependence problem into the effect size without
-# adding meaning. The raw difference in the metric's own units is the effect
-# size, which is the preferred form when the units mean something.
+# Neither effect size is standardised. Dividing by a variance that repeated
+# cross-validation renders ambiguous would import the dependence problem into
+# the effect size, so the raw difference in each metric's own units is used.
 
 import numpy as np  # noqa: E402
 from scipy import stats as _stats  # noqa: E402

@@ -204,9 +204,7 @@ def _no_individual_output_notice():
     )
 
 
-# ---------------------------------------------------------------------------
 # Tab 1: assess a release configuration
-# ---------------------------------------------------------------------------
 
 
 @st.cache_data(show_spinner=False)
@@ -550,9 +548,7 @@ def _export_section(name, stratum, row, drivers, table, band, mode, suppress,
         st.markdown(document)
 
 
-# ---------------------------------------------------------------------------
 # Tab 2: the study's own measured results
-# ---------------------------------------------------------------------------
 
 
 def _findings_tab():
@@ -620,9 +616,7 @@ def _findings_tab():
     )
 
 
-# ---------------------------------------------------------------------------
 # Tab 3: how to read any of this
-# ---------------------------------------------------------------------------
 
 
 def _guide_tab():

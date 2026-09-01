@@ -193,23 +193,14 @@ def point_estimates(low_df, high_df):
     return (low_df + high_df) / 2.0
 
 
-# ---------------------------------------------------------------------------
-# Phase 4: linkage under simulated side knowledge
-# ---------------------------------------------------------------------------
+# Linkage under simulated side knowledge. The attacker knows the target, knows
+# roughly which group they were in, and remembers a grade imprecisely, so
+# recollection is degraded by a tolerance rather than matched exactly: nobody
+# remembers a classmate scored 2.87, they remember "around a 3".
 #
-# Experiment B assumed an attacker with nothing but the released file. Phase 4
-# gives the attacker what a real person plausibly has: they know the target,
-# they know roughly which group the target was in, and they remember one or two
-# grades imprecisely. The question is how many records that narrows the field to.
-#
-# Side knowledge is simulated from within the dataset and then degraded, because
-# recollection is not exact. Nobody remembers a classmate scored 2.87; they
-# remember it was "around a 3". Degradation is expressed as a tolerance, so a
-# remembered value matches any released value within plus or minus that amount.
-#
-# No real individual is identified at any point. Targets are dataset rows, the
-# attacker's knowledge is derived from those same rows, and every metric
-# returned is an aggregate over all targets.
+# No real individual is identified. Targets are dataset rows, the attacker's
+# knowledge is derived from those rows, and every metric returned is an
+# aggregate over all targets.
 
 
 def _band_width_for(column, release_width):

@@ -1,70 +1,36 @@
 """Derivation-consistent generalisation. The engineered contribution.
 
-One modification to a standard de-identification pipeline, stated in full:
+One modification to a standard de-identification pipeline:
 
     When features are derived from a variable that has been generalised, derive
     them from the generalised values, not from the originals.
 
-That is the whole change. It is a [MODIFY] operation on the release step of an
-otherwise conventional generalisation pipeline. Nothing about the banding, the
-suppression, the risk metrics or the utility model differs between the baseline
-and the proposed method.
+It is a [MODIFY] operation on the release step alone. Banding, suppression, risk
+metrics and the utility model are identical between arms, so any measured
+difference is attributable to the derivation source.
 
-Why it matters
---------------
-Custodians generalise a grade sequence to protect students, then publish the
-engineered features their analysts asked for alongside it: the minimum, the
-maximum, the mean, the trend. Those features are computed from the original
-values and released at original precision.
-
-They are not summaries in any protective sense. `gpa_min` and `gpa_max` are
-exact order statistics of the sequence that was just banded, and each mean fixes
-a sum across it. Together they constrain the banded values back towards the
-numbers the bands were meant to hide, which `attack_models.reconstruct`
-demonstrates by interval propagation.
-
-Measured across three corpora, publishing them from the originals reverses 67%
-to 100% of the protection the generalisation provided, and recovers 21% to 94%
-of individual grades exactly. Recomputing them from the bands holds that
-protection, and it has a price: it costs 2.7 to 13.5 AUC-PR points depending on
-the corpus. The baseline release is therefore not dominated. It sits on the
-frontier at the high-utility, low-protection end, and the contribution is the
-measured trade-off rather than a free fix.
-
-An earlier version of this docstring claimed the opposite, that utility was
-"identical to three decimal places" and the baseline was a dominated choice.
-That was an artefact of passing the utility model only the generalised source
-columns, which are byte-identical between the two arms, so the model never saw
-the one thing that differs between them. The claim was withdrawn from four
-documents in August 2026. This docstring was missed at the time and is corrected
-here. See the comment in `risk_utility.py` guarding the fixed code path.
+Custodians generalise a grade sequence to protect students, then publish derived
+features alongside it at original precision. Those features are not summaries in
+any protective sense: `gpa_min` and `gpa_max` are exact order statistics of the
+sequence just banded, and each mean fixes a sum across it, so together they
+constrain the banded values back towards the numbers the bands were meant to
+hide. `attack_models.reconstruct` demonstrates this by interval propagation.
 
 Modes
 -----
 `NONE`      publish the generalised sequence, no derived features
 `BASELINE`  derive from the originals, publish at original precision. This is
-            what pipelines do today, and it is the arm the ablation reverts to
-`PROPOSED`  derive from the generalised values. The contribution
+            what pipelines do today, and the arm the ablation reverts to
+`PROPOSED`  derive from the generalised values
 `SELECTIVE` derive only the arithmetically constraining features from the
             generalised values, leaving the rest at original precision
 
-Why SELECTIVE exists
---------------------
-Table 5 of the manuscript partitions the eight derived features by whether each
-constrains the source values arithmetically. Only five do, and only those five
-enter the interval propagation the reconstruction attack uses. A release that
-recomputes those five from the protected values, while leaving `gpa_trend`,
-`gpa_consistency` and `n_weak_semesters` at original precision, therefore closes
-the arithmetic pathway while keeping three features the attack cannot exploit
-directly.
-
-Whether that holds is a measurement, not an assumption, and there is a specific
-reason to doubt it. The "does not constrain" classification was derived on the
-assumption that the whole block shares one derivation source. Under a mixed
-source it need not survive: `gpa_trend` at original precision is the exact
-difference between two source values, and combined with their published bands it
-pins the pair to a one-dimensional family. The containment and recovery checks
-are run against this arm for that reason.
+SELECTIVE exists to test whether the constraining classification in
+`deidentify.CONSTRAINING_COLUMNS` yields a usable intermediate release. It need
+not: under a mixed derivation source `gpa_trend` at original precision is the
+exact difference between two source values, which combined with their published
+bands pins the pair to a one-dimensional family. The containment and recovery
+checks are run against this arm for that reason.
 """
 
 from dataclasses import dataclass, field
@@ -80,8 +46,7 @@ SELECTIVE = "selective"
 
 MODES = (NONE, BASELINE, PROPOSED, SELECTIVE)
 
-# The findings document and the earlier notebooks used descriptive names for the
-# two derived modes. Kept so older result files remain readable.
+# Descriptive names retained so older result files remain readable.
 ALIASES = {"leaky": BASELINE, "safe": PROPOSED}
 
 
@@ -122,9 +87,7 @@ def build(frame, source_columns, band_width=None, suppress_k=None, mode=PROPOSED
                     constraining classification.
         4. Join and return.
 
-    Only step 3 differs between the two arms. Steps 1, 2 and 4 are identical, so
-    any difference in disclosure risk is attributable to the derivation source
-    and nothing else.
+    Only step 3 differs between arms.
     """
     mode = ALIASES.get(mode, mode)
     if mode not in MODES:
@@ -141,9 +104,8 @@ def build(frame, source_columns, band_width=None, suppress_k=None, mode=PROPOSED
 
     derived_columns = []
     if mode == SELECTIVE:
-        # Constraining features from the protected values, the rest from the
-        # originals. Both blocks are computed over the same columns, so the
-        # published schema is identical to the other arms.
+        # Both blocks are computed over the same columns, so the published
+        # schema stays identical to the other arms.
         protected = di.derive_features(released, source_columns)
         original = di.derive_features(frame, source_columns)
         free = [c for c in original.columns if c not in di.CONSTRAINING_COLUMNS]

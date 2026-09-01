@@ -23,19 +23,13 @@ matters enough to state before the code.
                             mechanism reproduces outside the study population,
                             and for no other purpose.
 
-An earlier decision in this project rejected the public corpus as a comparator
-for licensure prediction, on the grounds that Portuguese secondary students do
-not clear the "genuinely comparable" bar for a health professions topic
-(docs/TODO.md). That decision stands and is not reversed here, because it
-addressed a different use. Transfer learning for prediction needs comparable
-populations; a leak in an order statistic does not. gpa_min is the minimum of
-the sequence whether the student sits in Kumasi or Coimbra, so the mechanism
-replicates or fails to replicate independently of who the students are.
+The public corpus is admissible here although it would not be admissible as a
+comparator for prediction, and the distinction is the point: transfer learning
+needs comparable populations, a leak in an order statistic does not. `gpa_min`
+is the minimum of the sequence whether the student sits in Kumasi or Coimbra.
 
-The replication corpus is therefore never merged with the study population,
-never used to fit anything applied to it, and never cited in support of a claim
-about health records. Reported findings that mention it say which corpus they
-came from.
+It is never merged with the study population, never used to fit anything applied
+to it, and never cited in support of a claim about health records.
 
     allied_health   Accra School of Hygiene, EH / OHS / OT, cohorts 2021-2022.
                     110 students, credit-weighted CGPA, grades A to E, six
@@ -50,11 +44,9 @@ came from.
                     (Cortez & Silva, 2008). 649 students, three period grades
                     on a 0 to 20 scale.
 
-The public corpus earns its place twice. It is an independent replication on
-data nobody in this project assembled, and it is the only corpus here carrying
-demographic quasi-identifiers. The Ghanaian colleges released no demographics at
-all, so questions about age or address sitting beside grades can only be asked
-of this one.
+The public corpus is an independent replication on data nobody here assembled,
+and the only corpus carrying demographic quasi-identifiers, so questions about
+age or address beside grades can only be asked of it.
 """
 
 from dataclasses import dataclass, field
@@ -64,18 +56,14 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent
 
-# The bottom 40% of each corpus. Defined as a quantile rather than an absolute
-# grade because the three scales are not comparable: a cut-off that marks the
-# weakest 40% in one corpus marks the weakest 10% in another, and both
-# l-diversity and t-closeness are prevalence-sensitive.
+# A quantile rather than an absolute grade, because the three scales are not
+# comparable and l-diversity and t-closeness are both prevalence-sensitive.
 WEAK_QUANTILE = 0.40
 SENSITIVE = "weak_final"
 
-# Band widths are expressed as a fraction of each corpus's grade range, not as
-# absolute values. A band of 0.5 covers an eighth of a four-point GPA scale but
-# only a fortieth of a twenty-point scale, where it does not even merge adjacent
-# integers. Fixing the absolute width would have made generalisation look
-# ineffective on the public corpus when in fact it was never applied.
+# Fractions of each corpus's grade range, not absolute widths: 0.5 covers an
+# eighth of a four-point scale but a fortieth of a twenty-point one, where it
+# would not even merge adjacent integers.
 BAND_FRACTIONS = (0.0625, 0.125, 0.25)
 
 

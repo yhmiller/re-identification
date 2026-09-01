@@ -457,12 +457,8 @@ def build_all():
     ]
 
 
-
-
-# ---------------------------------------------------------------------------
 # Methods figures. These describe the procedure rather than plotting a result,
 # so they are drawn rather than read from a table.
-# ---------------------------------------------------------------------------
 
 INK = "#22262A"
 MUTED = "#6B7075"
@@ -792,7 +788,6 @@ def figure_importance():
     return _save(fig, "figure_9_importance")
 
 
-
 def _modelled_label(corpus, errors):
     """Corpus label carrying the number of records actually modelled.
 
@@ -1036,9 +1031,8 @@ def table_10_main_comparison():
 def table_12_statistical():
     """R4's confirmatory comparison table, generated from the two stat files.
 
-    Risk and utility comparisons live in separate outputs and were previously
-    merged by hand into the manuscript, which is where five of the nine effect
-    sizes went wrong.
+    Risk and utility comparisons live in separate outputs, so the merge happens
+    here rather than by hand in the manuscript.
     """
     risk = pd.read_csv(RESULTS / "confirmatory_risk.csv")
     utility = pd.read_csv(RESULTS / "confirmatory_utility.csv")

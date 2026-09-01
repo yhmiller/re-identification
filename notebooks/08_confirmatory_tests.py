@@ -72,7 +72,7 @@ def risk_comparison(stratum, band_width):
     # difference alone, which meant a reader wanting the two absolute figures
     # had to reconstruct one from the other. Reconstructing it from the
     # post-attack uniqueness in the ablation table gives a different quantity
-    # and produced a negative proportion, which is how this was found.
+    # and would produce a negative proportion.
     every_record = np.arange(len(stratum.frame))
     result["prop_unique_baseline"] = uniqueness(base)(every_record)
     result["prop_unique_proposed"] = uniqueness(prop)(every_record)

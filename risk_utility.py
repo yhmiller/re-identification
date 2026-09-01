@@ -114,9 +114,7 @@ def derived_block(frame, released, predictors, mode):
     attribute comes from, so modelling that block would leak the target. This
     recomputes over the predictors with the same source rule the release used.
 
-    One function serves both call sites so the mode rule exists once. An earlier
-    attempt to read the block off the release instead produced an AUC-PR of
-    1.000, which is what target leakage looks like.
+    One function serves both call sites so the mode rule exists once.
     """
     if mode == dc.NONE:
         return None
@@ -172,18 +170,10 @@ def frontier_row(
     risk = dr.risk_profile(released, release.visible_columns,
                            sensitive=target)
 
-    # Utility uses what the recipient actually receives: the generalised
-    # predictor columns plus the derived features published alongside them.
-    #
-    # An earlier version passed only the source columns. Those are byte-identical
-    # between the two derivation arms, so the model never saw the one thing that
-    # differs between them and utility came out identical by construction. That
-    # was an artefact, not a finding.
-    #
-    # Derived features here are computed over the predictor positions only, not
-    # the whole sequence. The sensitive attribute derives from the final observed
-    # position, so deriving over the full sequence would leak the target into the
-    # features.
+    # What the recipient actually receives: the generalised predictor columns
+    # plus the derived block. Passing only the source columns would make the two
+    # arms identical by construction, since those columns are byte-identical
+    # between them.
     features = released[predictors]
     derived = derived_block(frame, released, predictors, release.mode)
     if derived is not None:

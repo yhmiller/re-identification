@@ -1,36 +1,29 @@
-"""Stage 11. The GATE-3 and GATE-4 remediation sweep.
+"""Stage 11. Four release arms, suppression sweep and dominance.
 
-The testbed examination failed two desk-reject gates. This stage produces the
-measurements those gates require, in one pass so that nothing is compared across
-different builds.
+Extends the frontier of stage 07 along three axes:
 
-What it adds over the existing frontier:
+    a fourth release arm, SELECTIVE, and a dominance test over every arm
+    suppression at k = 0, 3 and 5 for every arm rather than one
+    the full risk metric set per configuration, so minimum k, marketer risk,
+    l-diversity and t-closeness are reported and not merely declared
 
-    G4.3  a fourth release arm, SELECTIVE, and a dominance test over every arm
-    G4.4  suppression at k = 0, 3 and 5 for every arm rather than one
-    Q3.1  the full declared risk metric set per configuration, so minimum k,
-          marketer risk, l-diversity and t-closeness stop being declared in
-          Methods and absent from Results
-    Q20.3 the reconstruction procedure and containment check run against the
-          new arm, not only against the baseline
+It also runs the reconstruction procedure and containment check against the new
+arm, since the arm exists to test whether closing the arithmetic pathway is
+enough.
 
-**On the selective arm.** Table 5 of the manuscript partitions the eight derived
-features by whether each constrains the source arithmetically. Five do. The
-selective arm recomputes those five from the protected values and leaves the
+**The selective arm.** `deidentify.CONSTRAINING_COLUMNS` partitions the eight
+derived features by whether each constrains the source arithmetically. Five do.
+The selective arm recomputes those five from the protected values and leaves the
 other three at original precision, which should close the arithmetic pathway
 while keeping features the reconstruction cannot exploit.
 
-The success criterion is fixed here, before the run, and is the one the gate
-demands: **uniqueness at or below the proposed arm, AUC-PR inside the baseline
-arm's dependence-corrected interval, and not dominated by the withhold arm on
-both axes.**
+Its success criterion is fixed in `SUCCESS_CRITERION` before the run and printed
+by every execution, because an arm judged after seeing its result is not a test.
 
-There is a specific reason to expect it may fail in two of the three corpora.
-The "does not constrain" classification assumed a single derivation source.
-Under a mixed source `gpa_trend` at original precision is the exact difference
-between two source values, and where the derived block is computed over only two
-predictor positions, that difference plus the published bands pins the pair to a
-one-dimensional family. Whether that happens is measured rather than assumed.
+There is reason to expect it to fail where the derived block spans only two
+predictor positions: `gpa_trend` at original precision is then the exact
+difference between two source values, and with their published bands it pins the
+pair to a one-dimensional family.
 
 Run:
     ml_env/bin/python notebooks/11_gate_remediation.py
@@ -90,7 +83,7 @@ def dominance(frame):
 
     An arm is dominated when another arm at the same band width and suppression
     threshold achieves uniqueness no higher and AUC-PR no lower, with at least
-    one strictly better. This is the test GATE-4 turns on.
+    one strictly better.
     """
     out = []
     for (band, k), group in frame.groupby(["band_width", "suppress_k"]):
