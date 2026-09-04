@@ -39,20 +39,16 @@ Thumbs.db
 # Tooling
 .gstack/
 
-# NOTE: docs/ is deliberately NOT ignored here. The manuscript, the literature
-# review and the topic document are the thesis and belong under version
-# control. The predecessor repository ignored /docs/* wholesale, which meant
-# moving these directories into docs/ removed them from git without warning.
-# Every file under docs/ carries aggregate findings only: no record-level
-# result, no identifier, no student name or index number appears in any of them.
+# The written thesis. The manuscript, the literature review and the earlier
+# submissions are kept local rather than published alongside the code that
+# reproduces them. Nothing under here is needed to run the pipeline, but the
+# manuscript-consistency tests read docs/manuscript/, so those tests cannot run
+# from a clone of this repository alone.
+docs/
 
 # The *linkage* rule above keeps the SID-to-index table out of git. It also
 # catches this analysis script by name. The script contains code, not data.
 !notebooks/06_linkage_attack.py
-
-# Downloaded source papers. Third-party copyright: reading copies are kept
-# locally, the citations live in docs/literature/sources.md.
-docs/literature/pdfs/
 
 # Agent working notes. Local only, never published.
 /AGENT.md

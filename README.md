@@ -122,7 +122,7 @@ imprecise recall isolates at most 40% of allied health students. Banding does
 not reduce that figure, because the cumulative average is not among the
 generalised columns. It does cut the grade-recall scenarios, from 20.9% to 5.5%.
 
-Full record: [docs/disclosure-risk-findings.md](docs/disclosure-risk-findings.md).
+Full record: `docs/disclosure-risk-findings.md`, which is kept local.
 
 ---
 
@@ -171,20 +171,24 @@ re-identification/
 │
 ├── strata.py                    corpus definitions, column roles, band widths
 ├── deidentify.py                banding, suppression, the 8 derived features
-├── derivation_consistent.py     THE ARTEFACT: NONE / BASELINE / PROPOSED
+├── derivation_consistent.py     THE ARTEFACT: NONE / BASELINE / PROPOSED / SELECTIVE
 ├── disclosure_risk.py           uniqueness, k, l, t, adversary risk
 ├── attack_models.py             interval-propagation reconstruction, linkage
 ├── risk_utility.py              release configs, cross-validated utility
 ├── stats_validation.py          subsampling, paired folds, dependence correction
 ├── figures.py                   every figure, the algorithm box, Table 1
-├── run_all.py  run.sh           one-command runner over the five stages
+├── run_all.py  run.sh           one-command runner over the nine stages
 │
 ├── notebooks/                   orchestration only, no logic
 │   ├── 04_disclosure_risk.py            Phases 1 and 2, baseline risk
 │   ├── 05_derived_feature_experiments.py Phase 3, Experiments A, B, C
 │   ├── 06_linkage_attack.py             Phase 4, adversarial validation
 │   ├── 07_risk_utility_frontier.py      Phase 5, the frontier
-│   └── 08_confirmatory_tests.py         pre-specified confirmatory comparisons
+│   ├── 08_confirmatory_tests.py         pre-specified confirmatory comparisons
+│   ├── 09_interpretability.py           SHAP importance under each arm
+│   ├── 10_error_and_curves.py           curves, fold scores, errors, cost
+│   ├── 11_gate_remediation.py           four arms, suppression, dominance
+│   └── 12_robustness.py                 seed, threshold and QI sensitivity
 │
 ├── scripts/
 │   ├── consolidate_real_data.py     allied health workbooks to one frame
@@ -192,11 +196,8 @@ re-identification/
 │   ├── build_model_dataset.py       assembles the modelling frame
 │   └── md2docx.py  read_docx.py  build_merged_pdf.py   writing tools
 │
-├── docs/                        tracked. The thesis itself
-│   ├── manuscript/              methods.md, results.md
-│   ├── literature/              protocol, query log, sources, gap analysis
-│   ├── NewDirection/            topic document, writing plan, analysis spec
-│   └── disclosure-risk-findings.md    authoritative record of every measurement
+├── docs/         gitignored. The written thesis: manuscript, literature
+│               review, topic document, and the record of every measurement
 │
 ├── data/         gitignored. Raw workbooks and the built corpora
 ├── local/        gitignored. The HMAC salt
@@ -205,10 +206,12 @@ re-identification/
 └── ml_env/       gitignored. Python 3.11 virtualenv
 ```
 
-Four directories are gitignored and must be carried by hand when the repository
+Five directories are gitignored and must be carried by hand when the repository
 is cloned somewhere new. `results/` regenerates from one command, `ml_env/`
 rebuilds from `requirements.txt`, but `data/` and `local/` cannot be
-reconstructed and are the only irreplaceable things here. `local/.nursing_salt`
+reconstructed and are the only irreplaceable things here. `docs/` holds the
+written thesis and is kept out of the published repository, so the tests that
+check the manuscript against the results cannot run from a clone alone. `local/.nursing_salt`
 in particular: lose it and no nursing pseudonym can ever be reproduced, which
 makes every nursing result unrepeatable.
 
@@ -237,7 +240,7 @@ disclosure_risk.py  risk_utility.py  attack_models.py
      stats_validation.py            does the difference survive testing
              │
              ▼
-     notebooks/04-08  →  results/  →  figures.py  →  docs/manuscript/
+     notebooks/04-12  →  results/  →  figures.py  →  docs/manuscript/
 ```
 
 **Why flat modules and not a `src/` package.** The numbered notebooks stay
