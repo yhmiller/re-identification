@@ -190,8 +190,8 @@ cannot disagree about what is left.
 - [x] Introduction, Methods, Results and Discussion drafted
 - [x] Pipeline extended to nine stages, notebooks 04 to 12, verified
       deterministic by SHA-256 snapshot
-- [x] 441 tests across 10 files, covering every analysis module and every number
-      quoted in the manuscript
+- [x] 463 tests across 10 files, covering every analysis module and every number
+      quoted in the manuscript. The suite is held locally, not published
 - [x] Testbed feedback answered, stages A to C closed 21 August 2026: 65 of 84
       register actions done, the rest recorded with a reason
 

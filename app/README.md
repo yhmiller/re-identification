@@ -35,7 +35,7 @@ and warns against the shape of the earlier licensure prototype:
 
 That prototype is not reused. Only its layout conventions are.
 
-`tests/test_release_report.py` enforces this: nothing per-record may cross
+A test held with the local suite enforces this: nothing per-record may cross
 `release_report.build`, and the interface source is parsed to check that no
 Streamlit table receives anything but an aggregate.
 
