@@ -39,9 +39,7 @@ Thumbs.db
 # Tooling
 .gstack/
 
-# The test suite. Held locally rather than published: it reads docs/manuscript/
-# and results/, neither of which is in this repository, so a clone could not run
-# it. What it verifies is described in README.md and in the covering note.
+
 tests/
 
 # The written thesis. The manuscript, the literature review and the earlier
