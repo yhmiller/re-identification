@@ -1,5 +1,5 @@
 # Participant data. Nothing under here may ever reach the remote: the raw
-# college records, the nursing workbooks, and the SID-to-index linkage table
+# college records, the nursing workbooks and the SID-to-index linkage table
 # are all directly or indirectly identifying.
 data/
 *.xlsx
@@ -39,8 +39,15 @@ Thumbs.db
 # Tooling
 .gstack/
 
-
+# The test suite. Held locally rather than published: it reads docs/manuscript/
+# and results/, neither of which is in this repository, so a clone could not run
+# it. What it verifies is described in README.md and in the covering note.
 tests/
+
+# Corpus construction and writing tools. The consolidation scripts parse the
+# specific institutional workbook layouts and do nothing without data/, which is
+# restricted; the rest convert manuscript drafts between formats.
+scripts/
 
 # The written thesis. The manuscript, the literature review and the earlier
 # submissions are kept local rather than published alongside the code that

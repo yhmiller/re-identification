@@ -66,6 +66,7 @@ minimum of the sequence regardless of who the student is.
 ```bash
 ml_env/bin/python scripts/consolidate_real_data.py        # allied health workbooks
 ml_env/bin/python scripts/consolidate_nursing_data.py     # nursing workbooks
+# scripts/ is held locally with the restricted data, not published
 ml_env/bin/python notebooks/04_disclosure_risk.py         # Phases 1 and 2
 ml_env/bin/python notebooks/05_derived_feature_experiments.py  # Phase 3
 ml_env/bin/python notebooks/06_linkage_attack.py          # Phase 4

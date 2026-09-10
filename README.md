@@ -149,6 +149,7 @@ re-running when the source workbooks change.
 ```bash
 ml_env/bin/python scripts/consolidate_real_data.py             # allied health
 ml_env/bin/python scripts/consolidate_nursing_data.py          # nursing
+# scripts/ is held locally with the restricted data, not published
 ml_env/bin/python notebooks/04_disclosure_risk.py              # Phases 1 and 2
 ml_env/bin/python notebooks/05_derived_feature_experiments.py  # Phase 3
 ml_env/bin/python notebooks/06_linkage_attack.py               # Phase 4
@@ -190,14 +191,12 @@ re-identification/
 │   ├── 11_gate_remediation.py           four arms, suppression, dominance
 │   └── 12_robustness.py                 seed, threshold and QI sensitivity
 │
-├── scripts/
-│   ├── consolidate_real_data.py     allied health workbooks to one frame
-│   ├── consolidate_nursing_data.py  nursing workbooks, HMAC pseudonymisation
-│   ├── build_model_dataset.py       assembles the modelling frame
-│   └── md2docx.py  read_docx.py  build_merged_pdf.py   writing tools
+├── scripts/      gitignored. Workbook consolidation and writing tools, held
+│               with the restricted data they parse
 │
 ├── docs/         gitignored. The written thesis: manuscript, literature
 │               review, topic document, and the record of every measurement
+├── tests/        gitignored. The suite that checks every reported number
 │
 ├── data/         gitignored. Raw workbooks and the built corpora
 ├── local/        gitignored. The HMAC salt
@@ -206,14 +205,20 @@ re-identification/
 └── ml_env/       gitignored. Python 3.11 virtualenv
 ```
 
-Five directories are gitignored and must be carried by hand when the repository
-is cloned somewhere new. `results/` regenerates from one command, `ml_env/`
+Eight directories are gitignored and must be carried by hand when the repository
+is cloned somewhere new. `results/` regenerates from one command and `ml_env/`
 rebuilds from `requirements.txt`, but `data/` and `local/` cannot be
-reconstructed and are the only irreplaceable things here. `docs/` holds the
-written thesis and is kept out of the published repository, so the tests that
-check the manuscript against the results cannot run from a clone alone. `local/.nursing_salt`
+reconstructed and are the only irreplaceable things here. `local/.nursing_salt`
 in particular: lose it and no nursing pseudonym can ever be reproduced, which
 makes every nursing result unrepeatable.
+
+**What a clone of this repository can and cannot do.** It carries the analysis
+modules, the numbered notebooks, the figure code and the runner, which is the
+whole of the method under test. It does not carry the written thesis, the test
+suite or the workbook consolidation scripts. The suite reads `docs/manuscript/`
+and `results/` and so could not run from a clone in any case; the consolidation
+scripts parse the specific institutional workbook layouts and do nothing without
+the restricted data. Both are available on request.
 
 ---
 
