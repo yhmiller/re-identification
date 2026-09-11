@@ -52,13 +52,6 @@ modification: derived features are recomputed from the protected values rather
 than from the originals. It closes the hole, and the cost of closing it is
 measured rather than assumed away.
 
-> **Scope note.** This replaced an earlier study predicting licensure failure
-> from the same records, which could not proceed because the outcome column was
-> never returned. Nothing was deleted. This repository was cloned from the
-> earlier one, so the whole history came across: the pre-pivot codebase is at
-> the tag `scope/licensure-prediction`, and the outcome tooling is at
-> the tag `licensure-archive`. Recover any of it with
-> `git show licensure-archive:archive/licensure-outcome/README.md`.
 
 ---
 
@@ -353,5 +346,4 @@ University of Science and Technology.
 
 ## License
 
-Shared for academic and research purposes under Creative Commons Attribution
-4.0 International (CC BY 4.0). See [LICENSE](LICENSE).
+Shared for academic and research purposes.
