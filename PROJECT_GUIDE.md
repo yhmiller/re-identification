@@ -169,7 +169,7 @@ Do not re-open these without a reason.
 
 ## Status
 
-**`TODO.md` is the queue.** It carries what is next, what blocks submission, and
+**The queue is kept in a local `TODO.md`, not published.** It carries what is next, what blocks submission, and
 the state of every chapter, each claim verified against the files rather than
 carried forward. This section records only what is settled, so the two documents
 cannot disagree about what is left.
@@ -196,7 +196,7 @@ cannot disagree about what is left.
 - [x] Testbed feedback answered, stages A to C closed 21 August 2026: 65 of 84
       register actions done, the rest recorded with a reason
 
-**Everything still open is in `TODO.md` §1**: three unwritten chapters, 18 open
+**Everything still open is in the local queue**: three unwritten chapters, 18 open
 register items, two word counts out of band, the database searches in
 `docs/literature/protocol.md` not yet run, and the ethics reference still a
 placeholder.
