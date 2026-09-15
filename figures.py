@@ -1147,23 +1147,23 @@ def table_11_column_survival():
     banded values can collapse where the same column at full precision does not.
     Whether it actually did is a fact, and this is the fact.
     """
-    frontier = pd.read_csv(RESULTS / "risk_utility_frontier.csv")
-    arms = frontier[(frontier.suppress_k == 0)
-                    & (frontier.derived_mode.isin(["baseline", "proposed"]))]
+    # Read from the sweep: the frontier carries the derivation arms at two of the
+    # three band widths only, and the condition is stated per band width.
+    sweep = pd.read_csv(RESULTS / "arm_sweep.csv")
+    sweep = sweep[sweep.suppress_k == 0]
     lines = ["| Corpus | Band | Source columns | Derived columns, baseline "
              "| Derived columns, proposed | Identical |",
              "|---|---|---|---|---|---|"]
     for corpus in CORPUS_LABEL:
-        sub = arms[arms.stratum == corpus]
-        source = frontier[(frontier.stratum == corpus)
-                          & (frontier.derived_mode == "none")].n_features.iloc[0]
+        sub = sweep[sweep.stratum == corpus]
         label = CORPUS_LABEL[corpus].split(" (")[0]
         for position, band in enumerate(sorted(sub.band_width.unique())):
             row = sub[sub.band_width == band]
-            b = int(row[row.derived_mode == "baseline"].n_features.iloc[0]) - int(source)
-            p = int(row[row.derived_mode == "proposed"].n_features.iloc[0]) - int(source)
+            source = int(row[row.derived_mode == "none"].n_features.iloc[0])
+            b = int(row[row.derived_mode == "baseline"].n_features.iloc[0]) - source
+            p = int(row[row.derived_mode == "proposed"].n_features.iloc[0]) - source
             lines.append(
-                f"| {label if position == 0 else ''} | {band:.2f} | {int(source)} "
+                f"| {label if position == 0 else ''} | {band:.2f} | {source} "
                 f"| {b} of 8 | {p} of 8 | {'yes' if b == p else '**no**'} |")
     path = RESULTS / "table_11_column_survival.md"
     path.write_text("\n".join(lines) + "\n")
