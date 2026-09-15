@@ -181,8 +181,9 @@ cannot disagree about what is left.
 - [x] Analysis specification frozen before the confirmatory stage
 - [x] Confirmatory comparisons run: subsampling for risk, paired folds with a
       dependence correction for utility
-- [x] Title and two objectives adopted. The marking scheme closed the question,
-      and the supervisor agreed the change on 19 August 2026
+- [x] Title and objectives adopted. The marking scheme closed the question,
+      and the supervisor agreed the change on 19 August 2026. A third objective,
+      answered by the theoretical framework, followed the testbed report
 - [x] Scoping literature search run, and its findings propagated to every
       document that carried the superseded novelty claim
 - [x] Nine critical sources read in full, 19 August 2026. Two wrong author
@@ -191,15 +192,19 @@ cannot disagree about what is left.
 - [x] Introduction, Methods, Results and Discussion drafted
 - [x] Pipeline extended to nine stages, notebooks 04 to 12, verified
       deterministic by SHA-256 snapshot
-- [x] 463 tests across 10 files, covering every analysis module and every number
+- [x] 480 tests across 10 files, covering every analysis module and every number
       quoted in the manuscript. The suite is held locally, not published
-- [x] Testbed feedback answered, stages A to C closed 21 August 2026: 65 of 84
-      register actions done, the rest recorded with a reason
+- [x] Testbed feedback answered: 66 of 84 register actions done, each open one
+      recorded with its reason and owner
+- [x] Round 2 Methods and Results sent to the supervisor on 15 September 2026.
+      Tag `v-submission-r2` marks the commit the reported results correspond to
 
-**Everything still open is in the local queue**: three unwritten chapters, 18 open
-register items, two word counts out of band, the database searches in
-`docs/literature/protocol.md` not yet run, and the ethics reference still a
-placeholder.
+**Where it stands: awaiting the supervisor's verification of Round 2.** Manuscript
+drafting does not open until that passes. Everything still open is in the local
+queue: corrections to the sent files ahead of a single resend, the ethics reference
+still a placeholder, 17 open register items, two word counts out of band, three
+unwritten chapters, and the database searches in `docs/literature/protocol.md` not
+yet run.
 
 Full plan: `docs/NewDirection/writing-plan.md`, kept local rather than published.
 
