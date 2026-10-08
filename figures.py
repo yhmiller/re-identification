@@ -1042,10 +1042,14 @@ def table_12_statistical():
     def interval(low, high):
         return f"[{low:+.3f}, {high:+.3f}]".replace("+0.000", "0.000")
 
+    # Two risk point estimates. Uniqueness is sample-size dependent, so the
+    # difference at 0.8n is not the difference at n, and the percentile interval
+    # belongs to the former. Printing one against the other's interval put a
+    # point estimate outside its own bounds at public band 5.00.
     lines = [
-        "| Corpus | Band | Risk difference | 95% CI | Utility difference "
-        "| 95% CI, corrected | p, corrected | d_z |",
-        "|---|---|---|---|---|---|---|---|",
+        "| Corpus | Band | Risk difference | Risk difference, 80% subsample "
+        "| 95% CI | Utility difference | 95% CI, corrected | p, corrected | d_z |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for corpus in CORPUS_LABEL:
         sub = merged[merged.stratum == corpus].sort_values("band_width")
@@ -1056,6 +1060,7 @@ def table_12_statistical():
             lines.append(
                 f"| {label if position == 0 else ''} | {row.band_width:.2f} "
                 f"| {row.difference_full_corpus:+.3f} "
+                f"| {row.difference_at_fraction:+.3f} "
                 f"| {interval(row.ci_low, row.ci_high)} "
                 f"| {row.mean_difference:+.3f} "
                 f"| {interval(row.corrected_ci_low, row.corrected_ci_high)} "

@@ -28,6 +28,7 @@ STAGES = [
     ("10_error_and_curves.py", "Curves, fold scores, error profiles and cost"),
     ("11_gate_remediation.py", "Four release arms, suppression sweep, dominance"),
     ("12_robustness.py", "Seed, threshold and quasi-identifier sensitivity"),
+    ("13_closeout.py", "Ten seeds, fold drop, three positions, per-arm attack and errors"),
 ]
 
 RULE = "=" * 78
