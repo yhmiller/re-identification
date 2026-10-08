@@ -423,6 +423,36 @@ def figure_explanation():
     return _save(fig, "figure_11_explanation")
 
 
+TOP_COLUMNS_PER_ARM = 5
+
+
+def table_19_importance_columns():
+    """R6's per-column SHAP values, which Figure 9 does not carry.
+
+    Figure 9 plots one bar per arm: the share of importance the whole derived
+    block holds. The per-column values R6 quotes had no artefact of their own,
+    so a reader could not check a ranking against anything.
+    """
+    shap = pd.read_csv(RESULTS / "interpretability_shap.csv")
+    lines = ["| Corpus | Arm | Rank | Column | Mean abs SHAP | Share of total |",
+             "|---|---|---|---|---|---|"]
+    for corpus in CORPUS_LABEL:
+        label = CORPUS_LABEL[corpus].split(" (")[0]
+        for mode in ("baseline", "proposed"):
+            rows = (shap[(shap.stratum == corpus) & (shap.derived_mode == mode)]
+                    .sort_values("mean_abs_shap", ascending=False)
+                    .head(TOP_COLUMNS_PER_ARM))
+            for position, row in enumerate(rows.itertuples(), start=1):
+                lines.append(
+                    f"| {label if position == 1 and mode == 'baseline' else ''} "
+                    f"| {mode if position == 1 else ''} | {position} "
+                    f"| `{row.column}` | {row.mean_abs_shap:.3f} "
+                    f"| {row.share_of_total * 100:.1f}% |")
+    path = RESULTS / "table_19_importance_columns.md"
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
 def build_all():
     """Every figure and table, in manuscript order."""
     return [
@@ -441,6 +471,7 @@ def build_all():
         table_15_arm_sweep(),
         table_16_suppression(),
         table_17_error_exchange(),
+        table_19_importance_columns(),
         # Results, Figures 5 to 9, in manuscript order.
         figure_pr_curves(),
         figure_fold_distribution(),
@@ -1212,7 +1243,7 @@ def figure_arm_frontier():
                      fontsize=9.5, color="#3A3F44")
         ax.set_xlabel("Records unique in the release (%)", fontsize=9)
         ax.set_xlim(-4, 104)
-    axes[0].set_ylabel("AUC-PR retained", fontsize=9)
+    axes[0].set_ylabel("AUC-PR", fontsize=9)
     axes[0].legend(fontsize=7.5, frameon=False, loc="lower left")
     fig.tight_layout()
     return _save(fig, "figure_8_arm_frontier")
