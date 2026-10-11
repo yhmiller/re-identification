@@ -132,7 +132,7 @@ def _values_pinned(frame, sequence, band_width):
     # truth is the sequence columns only; passing the whole frame breaks on
     # any non-numeric column, which the public corpus has.
     metrics = am.recovery_metrics(lo, hi, summary, band_width, truth=frame[sequence])
-    return float(metrics["prop_values_recovered_exactly"])
+    return float(metrics["prop_values_pinned_to_point"])
 
 
 def _decide(prop_unique, retained, risk_threshold, utility_tolerance):
