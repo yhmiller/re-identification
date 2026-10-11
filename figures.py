@@ -46,8 +46,17 @@ FIGURES.mkdir(parents=True, exist_ok=True)
 DPI = 300
 BASELINE = "#5B7C99"
 PROPOSED = "#2E7D4F"
+SELECTIVE_COLOUR = "#B26B2E"
 NEUTRAL = "#9AA5AD"
 GRID = "#DDE1E4"
+
+# Marker fill carries the release arm wherever all four appear together.
+ARM_STYLE = (
+    ("none", NEUTRAL, "white", "no derived features"),
+    ("baseline", BASELINE, BASELINE, "baseline derivation"),
+    ("proposed", PROPOSED, PROPOSED, "proposed derivation"),
+    ("selective", SELECTIVE_COLOUR, SELECTIVE_COLOUR, "selective derivation"),
+)
 
 CORPUS_LABEL = {
     "allied_health": "Allied health (n=110)",
@@ -144,23 +153,28 @@ def figure_frontier():
     Every configuration is a point. Up and to the right is better on both axes,
     so the Pareto set is the upper-right boundary. Baseline-derivation points
     sit far left: they retain utility and buy almost no protection.
+
+    Arms are read from the sweep rather than the frontier. The frontier carries
+    the derivation arms at two of the three band widths and carries no selective
+    arm at all, so a caption claiming every configuration was false of the
+    figure. The unprotected reference each axis is relative to has no arm, so it
+    still comes from the frontier.
     """
-    frame = pd.read_csv(RESULTS / "risk_utility_frontier.csv")
+    sweep = pd.read_csv(RESULTS / "arm_sweep.csv")
+    sweep = sweep[sweep.suppress_k == 0]
+    frontier = pd.read_csv(RESULTS / "risk_utility_frontier.csv")
+    unprotected = frontier[frontier.config == "original, no protection"]
     fig, ax = plt.subplots(figsize=(7.2, 5.2))
     _style(ax)
 
-    for corpus, group in frame.groupby("stratum"):
-        base = group[group["config"] == "original, no protection"].iloc[0]
+    for corpus, group in sweep.groupby("stratum"):
+        base = unprotected[unprotected.stratum == corpus].iloc[0]
         if base["prop_unique"] == 0:
             continue
         risk_cut = (base["prop_unique"] - group["prop_unique"]) / base["prop_unique"]
         utility = group["auc_pr"] / base["auc_pr"]
 
-        for mode, colour, face in (
-            ("baseline", BASELINE, BASELINE),
-            ("proposed", PROPOSED, PROPOSED),
-            ("none", NEUTRAL, "white"),
-        ):
+        for mode, colour, face, _ in ARM_STYLE:
             mask = (group["derived_mode"] == mode).to_numpy()
             if not mask.any():
                 continue
@@ -190,11 +204,8 @@ def figure_frontier():
                   for c in CORPUS_LABEL]
     fill_keys = [
         plt.Line2D([], [], marker="o", linestyle="", markersize=7,
-                   markerfacecolor=BASELINE, color=BASELINE, label="baseline derivation"),
-        plt.Line2D([], [], marker="o", linestyle="", markersize=7,
-                   markerfacecolor=PROPOSED, color=PROPOSED, label="proposed derivation"),
-        plt.Line2D([], [], marker="o", linestyle="", markersize=7,
-                   markerfacecolor="white", color=NEUTRAL, label="no derived features"),
+                   markerfacecolor=face, color=colour, label=label)
+        for _, colour, face, label in ARM_STYLE
     ]
     first = ax.legend(handles=shape_keys, fontsize=8, frameon=False,
                       loc="lower left", title="Corpus", title_fontsize=8.5)
@@ -472,6 +483,7 @@ def build_all():
         table_16_suppression(),
         table_17_error_exchange(),
         table_19_importance_columns(),
+        table_20_containment_by_arm(),
         # Results, Figures 5 to 9, in manuscript order.
         figure_pr_curves(),
         figure_fold_distribution(),
@@ -1015,12 +1027,17 @@ def table_10_main_comparison():
     what generating it prevents.
     """
     frontier = pd.read_csv(RESULTS / "risk_utility_frontier.csv")
+    # Arms come from the sweep, which is the only source carrying the selective
+    # arm. The two agree exactly on the arms they share at suppress_k zero.
+    sweep = pd.read_csv(RESULTS / "arm_sweep.csv")
+    sweep = sweep[sweep.suppress_k == 0]
     bands = {"allied_health": 0.5, "nursing": 0.5, "public": 2.5}
     order = [
         ("original, no protection", "Unprotected"),
         ("none", "Generalised, no derived features"),
         ("baseline", "Generalised + baseline derivation"),
         ("proposed", "Generalised + proposed derivation"),
+        ("selective", "Generalised + selective derivation"),
     ]
 
     lines = [
@@ -1029,24 +1046,25 @@ def table_10_main_comparison():
     ]
     for corpus, band in bands.items():
         rows = {}
-        for _, row in frontier[frontier.stratum == corpus].iterrows():
-            if row.config == "original, no protection":
-                rows["original, no protection"] = row
-            elif row.suppress_k == 0 and row.band_width == band:
-                rows[row.derived_mode] = row
+        unprotected = frontier[(frontier.stratum == corpus)
+                               & (frontier.config == "original, no protection")]
+        rows["original, no protection"] = unprotected.iloc[0]
+        for _, row in sweep[(sweep.stratum == corpus)
+                            & (sweep.band_width == band)].iterrows():
+            rows[row.derived_mode] = row
 
-        baseline, proposed = rows.get("baseline"), rows.get("proposed")
+        baseline = rows.get("baseline")
         label = CORPUS_LABEL[corpus].split(" (")[0]
         for key, description in order:
             row = rows.get(key)
             if row is None:
                 continue
             delta_u = delta_p = ""
-            if key == "proposed" and baseline is not None:
-                delta_u = (
-                    f"**{(proposed.prop_unique - baseline.prop_unique) * 100:+.1f} pp**"
-                )
-                delta_p = f"**{proposed.auc_pr - baseline.auc_pr:+.3f}**"
+            # Deltas are against the baseline arm, which is what both the
+            # proposed and the selective arm were built to be compared with.
+            if key in ("proposed", "selective") and baseline is not None:
+                delta_u = f"**{(row.prop_unique - baseline.prop_unique) * 100:+.1f} pp**"
+                delta_p = f"**{row.auc_pr - baseline.auc_pr:+.3f}**"
             lines.append(
                 f"| {label if key == order[0][0] else ''} | {description} "
                 f"| {row.prop_unique * 100:.1f}% | {delta_u} "
@@ -1060,43 +1078,65 @@ def table_10_main_comparison():
 
 
 def table_12_statistical():
-    """R4's confirmatory comparison table, generated from the two stat files.
+    """R4's confirmatory comparison table, generated from the stat files.
 
     Risk and utility comparisons live in separate outputs, so the merge happens
     here rather than by hand in the manuscript.
+
+    The selective arm is carried in the same table because it is the same two
+    tests on the same configurations, and in its own labelled block because it
+    was built after seeing the proposed arm's result. A reader must be able to
+    tell the pre-specified comparison from the remediation without reading the
+    Methods first.
     """
-    risk = pd.read_csv(RESULTS / "confirmatory_risk.csv")
-    utility = pd.read_csv(RESULTS / "confirmatory_utility.csv")
-    merged = risk.merge(utility, on=["stratum", "band_width"],
-                        suffixes=("_risk", "_utility"))
+    def pair(prefix, comparison):
+        risk = pd.read_csv(RESULTS / f"{prefix}_risk.csv")
+        utility = pd.read_csv(RESULTS / f"{prefix}_utility.csv")
+        merged = risk.merge(utility, on=["stratum", "band_width", "treatment"],
+                            suffixes=("_risk", "_utility"))
+        merged["comparison"] = comparison
+        return merged
+
+    blocks = [pair("confirmatory", "Proposed − baseline, pre-specified"),
+              pair("posthoc_selective", "Selective − baseline, post hoc")]
+
+    def signed(value):
+        """A sign on an exact zero reads as a rounded non-zero. Drop it."""
+        printed = f"{value:+.3f}"
+        return "0.000" if printed in ("+0.000", "-0.000") else printed
 
     def interval(low, high):
-        return f"[{low:+.3f}, {high:+.3f}]".replace("+0.000", "0.000")
+        return f"[{signed(low)}, {signed(high)}]"
 
     # Two risk point estimates. Uniqueness is sample-size dependent, so the
     # difference at 0.8n is not the difference at n, and the percentile interval
     # belongs to the former. Printing one against the other's interval put a
     # point estimate outside its own bounds at public band 5.00.
     lines = [
-        "| Corpus | Band | Risk difference | Risk difference, 80% subsample "
-        "| 95% CI | Utility difference | 95% CI, corrected | p, corrected | d_z |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| Comparison | Corpus | Band | Risk difference "
+        "| Risk difference, 80% subsample | 95% CI | Utility difference "
+        "| 95% CI, corrected | p, corrected | d_z |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
-    for corpus in CORPUS_LABEL:
-        sub = merged[merged.stratum == corpus].sort_values("band_width")
-        label = CORPUS_LABEL[corpus].split(" (")[0]
-        for position, row in enumerate(sub.itertuples()):
-            p = row.corrected_p
-            printed = "<0.0001" if p < 0.0001 else f"{p:.4f}".rstrip("0")
-            lines.append(
-                f"| {label if position == 0 else ''} | {row.band_width:.2f} "
-                f"| {row.difference_full_corpus:+.3f} "
-                f"| {row.difference_at_fraction:+.3f} "
-                f"| {interval(row.ci_low, row.ci_high)} "
-                f"| {row.mean_difference:+.3f} "
-                f"| {interval(row.corrected_ci_low, row.corrected_ci_high)} "
-                f"| {printed} | {row.cohens_d:+.2f} |"
-            )
+    for block in blocks:
+        comparison = block.comparison.iloc[0]
+        for index, corpus in enumerate(CORPUS_LABEL):
+            sub = block[block.stratum == corpus].sort_values("band_width")
+            label = CORPUS_LABEL[corpus].split(" (")[0]
+            for position, row in enumerate(sub.itertuples()):
+                p = row.corrected_p
+                printed = "<0.0001" if p < 0.0001 else f"{p:.4f}".rstrip("0")
+                first = index == 0 and position == 0
+                lines.append(
+                    f"| {comparison if first else ''} "
+                    f"| {label if position == 0 else ''} | {row.band_width:.2f} "
+                    f"| {signed(row.difference_full_corpus)} "
+                    f"| {signed(row.difference_at_fraction)} "
+                    f"| {interval(row.ci_low, row.ci_high)} "
+                    f"| {signed(row.mean_difference)} "
+                    f"| {interval(row.corrected_ci_low, row.corrected_ci_high)} "
+                    f"| {printed} | {row.cohens_d:+.2f} |"
+                )
 
     path = RESULTS / "table_12_statistical.md"
     path.write_text("\n".join(lines) + "\n")
@@ -1139,6 +1179,41 @@ def table_14_reconstruction():
                 f"| {row.prop_values_recovered_exactly * 100:.1f}% |"
             )
     path = RESULTS / "table_14_reconstruction.md"
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+ARM_NAME = {"baseline": "Baseline", "proposed": "Proposed", "selective": "Selective"}
+
+
+def table_20_containment_by_arm():
+    """The reconstruction attack against each arm, which Table 14 shows for one.
+
+    Containment reported for the baseline arm alone cannot show what the
+    protected arms do to the attack, and that is the whole Q20 question. Pinning
+    and recovery are printed side by side because they diverge here: against a
+    protected arm the propagation pins every value to a point while almost none
+    of those points is the true grade.
+    """
+    recon = pd.read_csv(RESULTS / "selective_reconstruction.csv")
+    lines = [
+        "| Corpus | Band | Arm | Interval width after, as a fraction of the band "
+        "| Values pinned to a point | Values recovered exactly | Containment |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for corpus in CORPUS_LABEL:
+        sub = recon[recon.stratum == corpus].sort_values(["band_width", "derived_mode"])
+        label = CORPUS_LABEL[corpus].split(" (")[0]
+        for position, row in enumerate(sub.itertuples()):
+            lines.append(
+                f"| {label if position == 0 else ''} | {row.band_width:.2f} "
+                f"| {ARM_NAME[row.derived_mode]} "
+                f"| {row.width_ratio_after:.4f} "
+                f"| {row.prop_values_pinned_to_point * 100:.1f}% "
+                f"| {row.prop_values_recovered_exactly * 100:.1f}% "
+                f"| {row.containment_check * 100:.1f}% |"
+            )
+    path = RESULTS / "table_20_containment_by_arm.md"
     path.write_text("\n".join(lines) + "\n")
     return path
 
@@ -1204,9 +1279,6 @@ def table_11_column_survival():
     path = RESULTS / "table_11_column_survival.md"
     path.write_text("\n".join(lines) + "\n")
     return path
-
-
-SELECTIVE_COLOUR = "#B26B2E"
 
 
 def figure_arm_frontier():

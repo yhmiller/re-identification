@@ -105,8 +105,10 @@ def reconstruct(frame, semester_cols, band_low, band_high, derived_frame):
 
     `band_low` and `band_high` are what the recipient sees. `derived_frame`
     carries the published derived features at full precision. Returns the
-    narrowed intervals plus, for each record, how many semesters were recovered
-    exactly.
+    narrowed intervals plus, for each record, how many semesters the propagation
+    pinned to a single point. Pinning is a property of the geometry alone:
+    whether a pinned point is the true grade cannot be known here, because the
+    truth is not an input to an attack.
     """
     n = len(semester_cols)
     lows, highs, exact_counts, observed_counts = [], [], [], []
@@ -129,7 +131,7 @@ def reconstruct(frame, semester_cols, band_low, band_high, derived_frame):
     summary = pd.DataFrame(
         {
             "semesters_observed": observed_counts,
-            "semesters_recovered_exactly": exact_counts,
+            "semesters_pinned_to_point": exact_counts,
         },
         index=frame.index,
     )
@@ -137,48 +139,68 @@ def reconstruct(frame, semester_cols, band_low, band_high, derived_frame):
 
 
 def recovery_metrics(low_df, high_df, summary, band_width, truth=None):
-    """Aggregate what the attack achieved. Never returns anything record-level."""
-    widths = (high_df - low_df).to_numpy(dtype=float)
-    observed = np.isfinite(widths)
-    widths = widths[observed]
+    """Aggregate what the attack achieved. Never returns anything record-level.
+
+    Two quantities are counted and deliberately kept apart. A value is *pinned*
+    when the propagation collapsed its interval to a point, which depends only
+    on the published constraints. A value is *recovered* when that point is the
+    true grade. Against a protected arm every value can be pinned while almost
+    none is recovered, because the attack applies original-value identities to
+    features computed from banded values, so a pinned count reported under the
+    word "recovered" reads as a successful attack precisely where the protection
+    held. Recovery is therefore reported only when the truth is supplied to
+    check it against, and never inferred from the geometry.
+    """
+    low = low_df.to_numpy(dtype=float)
+    high = high_df.to_numpy(dtype=float)
+    widths = high - low
+    observed_widths = widths[np.isfinite(widths)]
 
     total_observed = int(summary["semesters_observed"].sum())
-    total_exact = int(summary["semesters_recovered_exactly"].sum())
+    total_pinned = int(summary["semesters_pinned_to_point"].sum())
 
     metrics = {
         "band_width": band_width,
         "values_observed": total_observed,
         "mean_interval_width_before": band_width,
-        "mean_interval_width_after": float(np.mean(widths)) if widths.size else np.nan,
+        "mean_interval_width_after": (
+            float(np.mean(observed_widths)) if observed_widths.size else np.nan
+        ),
         "median_interval_width_after": (
-            float(np.median(widths)) if widths.size else np.nan
+            float(np.median(observed_widths)) if observed_widths.size else np.nan
         ),
-        "narrowing_ratio": (
-            float(np.mean(widths) / band_width) if widths.size else np.nan
+        # Named for the width it reports rather than for the change, because a
+        # ratio of zero means every interval collapsed to a point, which is the
+        # opposite of what "narrowing of zero" would say.
+        "width_ratio_after": (
+            float(np.mean(observed_widths) / band_width)
+            if observed_widths.size else np.nan
         ),
-        "values_recovered_exactly": total_exact,
-        "prop_values_recovered_exactly": (
-            total_exact / total_observed if total_observed else np.nan
+        "values_pinned_to_point": total_pinned,
+        "prop_values_pinned_to_point": (
+            total_pinned / total_observed if total_observed else np.nan
         ),
-        "prop_students_fully_recovered": float(
-            (
-                summary["semesters_recovered_exactly"] == summary["semesters_observed"]
-            ).mean()
+        "prop_students_fully_pinned": float(
+            (summary["semesters_pinned_to_point"] == summary["semesters_observed"]).mean()
         ),
-        "prop_students_partially_recovered": float(
-            (summary["semesters_recovered_exactly"] > 0).mean()
+        "prop_students_partially_pinned": float(
+            (summary["semesters_pinned_to_point"] > 0).mean()
         ),
     }
 
-    # Sanity check rather than a result: a correct attack must never exclude the
-    # true value from its own interval. Reported so a reviewer can see it held.
     if truth is not None:
         t = truth.to_numpy(dtype=float)
-        inside = (t >= low_df.to_numpy() - EXACT_TOLERANCE) & (
-            t <= high_df.to_numpy() + EXACT_TOLERANCE
-        )
-        valid = np.isfinite(t) & np.isfinite(low_df.to_numpy())
+        valid = np.isfinite(t) & np.isfinite(low)
+        inside = (t >= low - EXACT_TOLERANCE) & (t <= high + EXACT_TOLERANCE)
+        recovered = valid & inside & (widths <= EXACT_TOLERANCE)
+        # Containment below 1.0 is not a defect of the procedure. It is the
+        # arithmetic pathway being closed: the premise the attack reasons from
+        # is false, so its intervals exclude the value they are built around.
         metrics["containment_check"] = float(inside[valid].mean())
+        metrics["values_recovered_exactly"] = int(recovered.sum())
+        metrics["prop_values_recovered_exactly"] = (
+            float(recovered.sum() / total_observed) if total_observed else np.nan
+        )
 
     return metrics
 

@@ -40,17 +40,23 @@ import strata as st  # noqa: E402
 RESULTS = ROOT / "results" / "disclosure"
 RESULTS.mkdir(parents=True, exist_ok=True)
 
+# The proposed arm is the comparison the specification fixed in advance. The
+# selective arm was built after seeing the proposed arm's result, so it is run
+# through the same two tests but written to its own files, and never merged into
+# the confirmatory ones.
+TREATMENTS = {dc.PROPOSED: "confirmatory", dc.SELECTIVE: "posthoc_selective"}
 
-def risk_comparison(stratum, band_width):
-    """Difference in uniqueness between the two derivation arms.
+
+def risk_comparison(stratum, band_width, treatment=dc.PROPOSED):
+    """Difference in uniqueness between the baseline arm and one treatment arm.
 
     Subsampling without replacement rather than the ordinary bootstrap, because
     duplicated records destroy uniqueness asymmetrically between arms. The full
     corpus estimate is reported beside the subsample estimate so that any drift
     from the reduced set size is visible.
     """
-    base = dc.baseline(stratum.frame, stratum.sequence, band_width=band_width)
-    prop = dc.proposed(stratum.frame, stratum.sequence, band_width=band_width)
+    base = dc.build(stratum.frame, stratum.sequence, band_width, None, dc.BASELINE)
+    prop = dc.build(stratum.frame, stratum.sequence, band_width, None, treatment)
 
     def uniqueness(release):
         cols = release.visible_columns
@@ -74,14 +80,14 @@ def risk_comparison(stratum, band_width):
     # and would produce a negative proportion.
     every_record = np.arange(len(stratum.frame))
     result["prop_unique_baseline"] = uniqueness(base)(every_record)
-    result["prop_unique_proposed"] = uniqueness(prop)(every_record)
+    result[f"prop_unique_{treatment}"] = uniqueness(prop)(every_record)
     return result
 
 
-def utility_comparison(stratum, band_width):
-    """Paired per-fold AUC-PR difference between the two derivation arms."""
+def utility_comparison(stratum, band_width, treatment=dc.PROPOSED):
+    """Paired per-fold AUC-PR difference between baseline and one treatment arm."""
     folds = {}
-    for mode in (dc.BASELINE, dc.PROPOSED):
+    for mode in (dc.BASELINE, treatment):
         row = ru.frontier_row(
             stratum.frame,
             stratum.sequence,
@@ -94,16 +100,16 @@ def utility_comparison(stratum, band_width):
         )
         folds[mode] = row
     result = sv.paired_fold_difference(
-        folds[dc.PROPOSED]["fold_auc_pr"],
+        folds[treatment]["fold_auc_pr"],
         folds[dc.BASELINE]["fold_auc_pr"],
         n_splits=ru.N_CV_FOLDS,
     )
     result["fold_differences"] = list(
-        np.asarray(folds[dc.PROPOSED]["fold_auc_pr"])
+        np.asarray(folds[treatment]["fold_auc_pr"])
         - np.asarray(folds[dc.BASELINE]["fold_auc_pr"])
     )
     result["auc_pr_baseline"] = folds[dc.BASELINE]["auc_pr"]
-    result["auc_pr_proposed"] = folds[dc.PROPOSED]["auc_pr"]
+    result[f"auc_pr_{treatment}"] = folds[treatment]["auc_pr"]
     result["relative_loss"] = (
         result["mean_difference"] / folds[dc.BASELINE]["auc_pr"]
         if folds[dc.BASELINE]["auc_pr"]
@@ -112,46 +118,54 @@ def utility_comparison(stratum, band_width):
     return result
 
 
-def main():
+def _report(width, risk, utility, treatment):
+    print(f"\n  band {width:g}")
+    print(f"    RISK      {treatment} minus baseline uniqueness")
+    print(
+        f"              full corpus {risk['difference_full_corpus']:+.4f}, "
+        f"at {risk['subsample_fraction']:.0%} {risk['difference_at_fraction']:+.4f}"
+    )
+    print(
+        f"              95% CI [{risk['ci_low']:+.4f}, {risk['ci_high']:+.4f}]  "
+        f"{'excludes 0' if risk['excludes_zero'] else 'includes 0'}"
+    )
+    print(f"    UTILITY   {treatment} minus baseline AUC-PR")
+    print(
+        f"              {utility['mean_difference']:+.4f}  "
+        f"({utility['relative_loss']:+.1%} of baseline "
+        f"{utility['auc_pr_baseline']:.4f})"
+    )
+    print(
+        f"              naive     CI [{utility['naive_ci_low']:+.4f}, "
+        f"{utility['naive_ci_high']:+.4f}]  p {utility['naive_p']:.2e}"
+    )
+    print(
+        f"              corrected CI [{utility['corrected_ci_low']:+.4f}, "
+        f"{utility['corrected_ci_high']:+.4f}]  p {utility['corrected_p']:.2e}  "
+        f"SE x{utility['se_inflation']:.2f}"
+    )
+
+
+def compare(treatment):
+    """Both confirmatory comparisons, for one treatment arm against baseline."""
     risk_rows, utility_rows = [], []
-
     for name, s in st.load_all().items():
-        print(f"\n{'=' * 78}\n{name}: {s.n} records\n{'=' * 78}")
-
+        print(f"\n{'=' * 78}\n{name}: {s.n} records, {treatment} minus baseline"
+              f"\n{'=' * 78}")
         for width in s.band_widths:
-            r = risk_comparison(s, width)
-            r.update(stratum=name, band_width=width)
+            r = risk_comparison(s, width, treatment)
+            r.update(stratum=name, band_width=width, treatment=treatment)
             risk_rows.append(r)
 
-            u = utility_comparison(s, width)
-            u.update(stratum=name, band_width=width)
+            u = utility_comparison(s, width, treatment)
+            u.update(stratum=name, band_width=width, treatment=treatment)
             utility_rows.append(u)
 
-            print(f"\n  band {width:g}")
-            print(f"    RISK      proposed minus baseline uniqueness")
-            print(
-                f"              full corpus {r['difference_full_corpus']:+.4f}, "
-                f"at {r['subsample_fraction']:.0%} {r['difference_at_fraction']:+.4f}"
-            )
-            print(
-                f"              95% CI [{r['ci_low']:+.4f}, {r['ci_high']:+.4f}]  "
-                f"{'excludes 0' if r['excludes_zero'] else 'includes 0'}"
-            )
-            print(f"    UTILITY   proposed minus baseline AUC-PR")
-            print(
-                f"              {u['mean_difference']:+.4f}  "
-                f"({u['relative_loss']:+.1%} of baseline {u['auc_pr_baseline']:.4f})"
-            )
-            print(
-                f"              naive     CI [{u['naive_ci_low']:+.4f}, "
-                f"{u['naive_ci_high']:+.4f}]  p {u['naive_p']:.2e}"
-            )
-            print(
-                f"              corrected CI [{u['corrected_ci_low']:+.4f}, "
-                f"{u['corrected_ci_high']:+.4f}]  p {u['corrected_p']:.2e}  "
-                f"SE x{u['se_inflation']:.2f}"
-            )
+            _report(width, r, u, treatment)
+    return risk_rows, utility_rows
 
+
+def write(prefix, risk_rows, utility_rows):
     # Per-fold differences go to their own long-format table. The stability
     # figure needs the distribution rather than the summary: a figure showing
     # only means would hide the corpus whose folds straddle zero.
@@ -161,19 +175,24 @@ def main():
         for u in utility_rows for i, d in enumerate(u["fold_differences"])
     ]
     pd.DataFrame(fold_rows).to_csv(
-        RESULTS / "confirmatory_fold_differences.csv", index=False
+        RESULTS / f"{prefix}_fold_differences.csv", index=False
     )
 
-    for rows, filename in (
-        (risk_rows, "confirmatory_risk.csv"),
-        (utility_rows, "confirmatory_utility.csv"),
-    ):
+    for rows, filename in ((risk_rows, f"{prefix}_risk.csv"),
+                           (utility_rows, f"{prefix}_utility.csv")):
         frame = pd.DataFrame(rows).drop(columns=["fold_differences"], errors="ignore")
         lead = ["stratum", "band_width"]
         frame = frame[lead + [c for c in frame.columns if c not in lead]]
         frame.to_csv(RESULTS / filename, index=False)
+    return 3
 
-    print(f"\nwrote 2 tables to {RESULTS.relative_to(ROOT)}/")
+
+def main():
+    written = 0
+    for treatment, prefix in TREATMENTS.items():
+        written += write(prefix, *compare(treatment))
+
+    print(f"\nwrote {written} tables to {RESULTS.relative_to(ROOT)}/")
 
 
 if __name__ == "__main__":
