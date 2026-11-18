@@ -484,6 +484,7 @@ def build_all():
         table_17_error_exchange(),
         table_19_importance_columns(),
         table_20_containment_by_arm(),
+        table_21_leak_sensitivity(),
         # Results, Figures 5 to 9, in manuscript order.
         figure_pr_curves(),
         figure_fold_distribution(),
@@ -1077,6 +1078,14 @@ def table_10_main_comparison():
     return path
 
 
+def _format_p(value):
+    """A p value to four places, with no trailing zeros except a bare 1.0."""
+    if value < 0.0001:
+        return "<0.0001"
+    printed = f"{value:.4f}".rstrip("0")
+    return printed + "0" if printed.endswith(".") else printed
+
+
 def table_12_statistical():
     """R4's confirmatory comparison table, generated from the stat files.
 
@@ -1115,8 +1124,8 @@ def table_12_statistical():
     lines = [
         "| Comparison | Corpus | Band | Risk difference "
         "| Risk difference, 80% subsample | 95% CI | Utility difference "
-        "| 95% CI, corrected | p, corrected | d_z |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| 95% CI, corrected | p, corrected | p, Holm | d_z |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for block in blocks:
         comparison = block.comparison.iloc[0]
@@ -1124,8 +1133,6 @@ def table_12_statistical():
             sub = block[block.stratum == corpus].sort_values("band_width")
             label = CORPUS_LABEL[corpus].split(" (")[0]
             for position, row in enumerate(sub.itertuples()):
-                p = row.corrected_p
-                printed = "<0.0001" if p < 0.0001 else f"{p:.4f}".rstrip("0")
                 first = index == 0 and position == 0
                 lines.append(
                     f"| {comparison if first else ''} "
@@ -1135,7 +1142,8 @@ def table_12_statistical():
                     f"| {interval(row.ci_low, row.ci_high)} "
                     f"| {signed(row.mean_difference)} "
                     f"| {interval(row.corrected_ci_low, row.corrected_ci_high)} "
-                    f"| {printed} | {row.cohens_d:+.2f} |"
+                    f"| {_format_p(row.corrected_p)} | {_format_p(row.holm_p)} "
+                    f"| {row.cohens_d:+.2f} |"
                 )
 
     path = RESULTS / "table_12_statistical.md"
@@ -1214,6 +1222,37 @@ def table_20_containment_by_arm():
                 f"| {row.containment_check * 100:.1f}% |"
             )
     path = RESULTS / "table_20_containment_by_arm.md"
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def table_21_leak_sensitivity():
+    """The nursing arm comparison with and without the outcome rule.
+
+    Both samples are scored by the same routine on the same folds, so the rows
+    differ only in whether records whose outcome sits inside the predictors are
+    kept. Printing both is what measures the leak, and what lets a reader see
+    that the direction survives its removal while the size and the significance
+    do not.
+    """
+    comparison = pd.read_csv(RESULTS / "leak_audit_arm_comparison.csv")
+    names = {"all_modelled": "Every record with complete predictors",
+             "leak_free": "Outcome follows the predictors"}
+    lines = [
+        "| Band | Sample | Records | Baseline | Proposed | Difference "
+        "| 95% CI, corrected | p, corrected | Folds below zero |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    for band, group in comparison.groupby("band_width"):
+        for position, row in enumerate(group.itertuples()):
+            lines.append(
+                f"| {band:.2f} | {names[row.sample]} | {row.n_modelled} "
+                f"| {row.auc_pr_baseline:.4f} | {row.auc_pr_proposed:.4f} "
+                f"| {row.mean_difference:+.4f} "
+                f"| [{row.corrected_ci_low:+.3f}, {row.corrected_ci_high:+.3f}] "
+                f"| {_format_p(row.corrected_p)} | {row.folds_favouring_baseline} of {row.n_folds} |"
+            )
+    path = RESULTS / "table_21_leak_sensitivity.md"
     path.write_text("\n".join(lines) + "\n")
     return path
 
