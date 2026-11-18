@@ -242,12 +242,13 @@ arms, so it never saw the derived features that are the only thing separating
 them. Corrected, the model receives what a recipient actually receives.
 
 Derived features computed from unprotected source values restore
-much of the analytical utility that generalisation removed, between 79% and 119%
-across the evaluated configurations, and much of the disclosure risk it removed,
+much of the analytical utility that generalisation removed, between 79% and 97%
+across the evaluated configurations of the two corpora where generalisation costs
+utility, and much of the disclosure risk it removed,
 between 67% and 100%. Both come back substantially, which is consistent with the
 same information driving both, though the two percentages are not numerically
 equal configuration by configuration. Closing the leak therefore has a price:
-recomputing the derived features from the protected values costs 2.7 to 13.5
+recomputing the derived features from the protected values costs 2.7 to 7.1
 AUC-PR points depending on the corpus.
 
 The baseline release is therefore not dominated. It sits on the frontier at the

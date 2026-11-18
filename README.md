@@ -10,19 +10,20 @@ Measurably, yes, and the leak is not free to close.
 
 Publishing derived features at original precision alongside generalised source
 variables restores **67% to 100%** of the disclosure risk the generalisation
-removed, and **79% to 119%** of the analytical utility it removed. On the two
+removed, and **79% to 97%** of the analytical utility it removed in the two corpora
+where generalisation costs utility. On the two
 Ghanaian corpora the risk figure is 98.7% to 100%, so for the study population
 the generalisation is, for practical purposes, undone.
 
 Both quantities come back substantially, which is what one expects if the same
 information drives both. They are **not** numerically equal configuration by
 configuration and are not presented as though they were. The utility ratio has an
-unstable denominator, and it exceeds 100% in the nursing corpus because the
-baseline release carries eight derived features that the unprotected release does
-not.
+unstable denominator. In the nursing corpus it is undefined: on the 140 students
+who can be scored fairly, the generalised release already scores above the
+unprotected one, so generalisation removed no utility to restore.
 
 Recomputing the derived features from the protected values closes the leak, and
-costs **2.7 to 13.5 AUC-PR points** depending on the corpus. That is a genuine
+costs **2.7 to 7.1 AUC-PR points** depending on the corpus. That is a genuine
 privacy-utility trade-off, not a free fix, and the frontier is what a custodian
 chooses from.
 
@@ -82,18 +83,22 @@ or about Ghanaian institutions rests on it. See [strata.py](strata.py).
 | Fewest attributes reaching 100% unique | 2 | 5 | not reached (67.8% at 6) |
 | Uncertainty removed by baseline derivation | 100% | 98.7-100% | 67-88% |
 | Source values narrowed to a point | 20.9-33.9% | 34.1-62.8% | 74.1-93.7% |
-| Utility restored by baseline derivation | 79-80% | 115-119% | 93-97% |
-| Utility cost of closing the leak (AUC-PR) | -0.027 | -0.135 | -0.067 |
+| Utility restored by baseline derivation | 79-80% | undefined | 93-97% |
+| Utility cost of closing the leak (AUC-PR) | -0.027 | -0.071 | -0.067 |
 
 ### What survives formal testing
 
 Risk reduction is distinguishable from zero in **eight of nine** configurations.
-Utility cost in **six of nine**: every nursing and every public configuration,
-and none of the three allied health configurations, where corrected p values are
-0.890, 0.361 and 0.854.
+Utility cost in **three of nine**: the three public configurations. None of the
+six Ghanaian configurations is significant under the corrected test. Corrected p
+values are 0.890, 0.361 and 0.854 in allied health and 0.367, 0.089 and 0.091 in
+nursing. Four of the six are significant under the uncorrected paired test and
+the Wilcoxon test, so the Ghanaian verdict rests on the dependence correction.
 
 The allied health null is a power result at 109 modelled records, not evidence of
-no cost. Its interval at band 0.50 reaches -0.087, admitting a cost larger than
+no cost. The nursing null is the same kind of result at 140 modelled records,
+because nursing is scored only on the students whose outcome follows the
+predictors, which excludes the 2024 intake. Its interval at band 0.50 reaches -0.087, admitting a cost larger than
 several observed elsewhere and equally admitting none. The same
 corpus proved too small for generalisation to protect at all, so one sample-size
 story appears twice.
