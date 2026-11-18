@@ -22,6 +22,7 @@ does not use would cost nothing and prove nothing.
 """
 
 import numpy as np
+import pandas as pd
 from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.model_selection import RepeatedStratifiedKFold
 from xgboost import XGBClassifier
@@ -94,6 +95,26 @@ def cross_validated_utility(X, y, seed=BASE_SEED, return_folds=False):
     return out
 
 
+def outcome_follows_predictors(frame, semester_cols, predictors):
+    """Records whose outcome grade lies strictly after every predictor column.
+
+    The sensitive attribute is weak performance in each record's own last
+    observed position, while the predictors are one fixed prefix of the
+    sequence. A record observed no further than that prefix has its outcome
+    sitting inside the predictors, so the label is a threshold on a column the
+    recipient already holds and the model is not predicting anything. Such
+    records can score well and say nothing, so they are kept out of every
+    utility sample. Risk is a property of the released file and still uses
+    every record.
+    """
+    columns = list(semester_cols)
+    observed = frame[columns].notna().to_numpy()
+    last_observed = observed.shape[1] - 1 - np.argmax(observed[:, ::-1], axis=1)
+    last_predictor = max(columns.index(c) for c in predictors)
+    return pd.Series(observed.any(axis=1) & (last_observed > last_predictor),
+                     index=frame.index)
+
+
 def derived_block(frame, released, predictors, mode):
     """The derived block a recipient models, over the predictor positions only.
 
@@ -119,12 +140,16 @@ def derived_block(frame, released, predictors, mode):
 
 
 def release_matrix(frame, semester_cols, predictors, target, band_width=None,
-                   suppress_k=None, derived_mode="none"):
+                   suppress_k=None, derived_mode="none", leak_free=True):
     """The feature matrix and labels a recipient of this release could model.
 
     Extracted so every stage that scores a release builds it the same way. A
     second implementation is how the two arms end up differing in something
     other than the derivation source.
+
+    `leak_free=False` keeps the records whose outcome sits inside the
+    predictors. It exists only so the leak can be measured against the sample
+    that excludes it.
     """
     release = dc.build(frame, semester_cols, band_width, suppress_k, derived_mode)
     released = release.frame
@@ -136,6 +161,9 @@ def release_matrix(frame, semester_cols, predictors, target, band_width=None,
         features = features.join(derived[informative])
 
     usable = features.join(frame[[target]]).dropna()
+    if leak_free:
+        follows = outcome_follows_predictors(frame, semester_cols, predictors)
+        usable = usable[follows.reindex(usable.index)]
     columns = [c for c in usable.columns if c != target]
     return usable[columns], usable[target], columns
 
@@ -150,8 +178,14 @@ def frontier_row(
     suppress_k=None,
     derived_mode="none",
     return_folds=False,
+    leak_free=True,
 ):
-    """One point on the frontier: what this configuration protects, and costs."""
+    """One point on the frontier: what this configuration protects, and costs.
+
+    Risk uses every record of the release. Utility uses only the records whose
+    outcome follows the predictors, so the two axes can rest on different
+    numbers of records, and `n_modelled` says which sample the utility did.
+    """
     release = dc.build(frame, semester_cols, band_width, suppress_k, derived_mode)
     released, suppressed = release.frame, release.records_suppressed
 
@@ -169,6 +203,9 @@ def frontier_row(
         features = features.join(derived[informative])
 
     usable = features.join(frame[[target]]).dropna()
+    if leak_free:
+        follows = outcome_follows_predictors(frame, semester_cols, predictors)
+        usable = usable[follows.reindex(usable.index)]
     feature_columns = [c for c in usable.columns if c != target]
     if len(usable) > 20 and usable[target].nunique() > 1:
         utility = cross_validated_utility(

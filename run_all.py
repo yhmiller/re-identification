@@ -29,6 +29,7 @@ STAGES = [
     ("11_gate_remediation.py", "Four release arms, suppression sweep, dominance"),
     ("12_robustness.py", "Seed, threshold and quasi-identifier sensitivity"),
     ("13_closeout.py", "Ten seeds, fold drop, three positions, per-arm attack and errors"),
+    ("14_outcome_leak_diagnostic.py", "Outcome-position audit and the leak sensitivity analysis"),
 ]
 
 RULE = "=" * 78

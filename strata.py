@@ -80,10 +80,13 @@ class Stratum:
     scale: str
     scale_max: float
     demographics: list = field(default_factory=list)
-    # Sequence positions the utility model may use. The last observed position
-    # is excluded because the sensitive attribute derives from it, and so are
-    # CGPA and the grade counts, which are computed over the whole sequence
-    # including it. Nursing stops at two because coverage thins after that.
+    # Sequence positions the utility model may use. CGPA and the grade counts
+    # are excluded because they are computed over the whole sequence, which
+    # includes the position the sensitive attribute derives from. This is a
+    # fixed prefix while the outcome position varies per record, so a record
+    # observed no further than the prefix has its outcome inside the predictors.
+    # risk_utility.outcome_follows_predictors removes those records from every
+    # utility sample. Nursing stops at two because coverage thins after that.
     predictors: list = field(default_factory=list)
 
     @property

@@ -168,7 +168,7 @@ def _error_profile(y, proba):
     }
 
 
-def _band_edge_profile(stratum, band, y, proba, mode):
+def _band_edge_profile(stratum, band, index, y, proba, mode):
     """Q21.2. How far the misclassified sit from the nearest band boundary.
 
     The examination's hypothesis: the proposed arm's extra false positives are
@@ -180,12 +180,14 @@ def _band_edge_profile(stratum, band, y, proba, mode):
     aggregate-only rule that governs every other output governs this one.
     """
     predicted = (proba >= ERROR_THRESHOLD).astype(int)
-    grades = stratum.frame[stratum.predictors].reindex(
-        stratum.frame.index).to_numpy(dtype=float)
+    # `index` is the scored records' own row labels. Taking the first len(y)
+    # rows of the frame instead pairs each prediction with the wrong record
+    # whenever listwise deletion or the leak-free restriction removes any
+    # record that is not at the end of the frame.
+    grades = stratum.frame.loc[index, stratum.predictors].to_numpy(dtype=float)
     # Distance to the nearest band edge, averaged over a record's predictors.
     offset = np.mod(grades, band)
     distance = np.nanmean(np.minimum(offset, band - offset), axis=1)
-    distance = distance[: len(y)]
 
     groups = {
         "false positive": (y == 0) & (predicted == 1),
@@ -293,7 +295,7 @@ def main():
             edge_rows.extend([
                 {"stratum": name, **row}
                 for row in _band_edge_profile(
-                    stratum, band, scored["y"], scored["mean_proba"], mode)
+                    stratum, band, X.index, scored["y"], scored["mean_proba"], mode)
             ])
 
             cost_rows.append(
