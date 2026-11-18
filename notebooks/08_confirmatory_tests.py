@@ -146,6 +146,20 @@ def _report(width, risk, utility, treatment):
     )
 
 
+def add_holm(utility_rows):
+    """Holm-adjust the corrected p within each corpus.
+
+    The family is one corpus's utility comparisons across its three band widths,
+    which M16 declares. Risk comparisons carry percentile intervals and no p
+    value, so they have nothing to adjust.
+    """
+    for stratum in {row["stratum"] for row in utility_rows}:
+        family = [row for row in utility_rows if row["stratum"] == stratum]
+        adjusted = sv.holm_adjust([row["corrected_p"] for row in family])
+        for row, value in zip(family, adjusted):
+            row["holm_p"] = float(value)
+
+
 def compare(treatment):
     """Both confirmatory comparisons, for one treatment arm against baseline."""
     risk_rows, utility_rows = [], []
@@ -162,6 +176,7 @@ def compare(treatment):
             utility_rows.append(u)
 
             _report(width, r, u, treatment)
+    add_holm(utility_rows)
     return risk_rows, utility_rows
 
 

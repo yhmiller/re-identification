@@ -8,6 +8,24 @@ import numpy as np
 from scipy import stats as _stats
 
 
+def holm_adjust(p_values):
+    """Holm step-down adjusted p values (Holm, 1979), in the input order.
+
+    The smallest p is multiplied by the family size, the next by one fewer, and
+    so on, with each adjusted value held at or above the one before it and
+    capped at one. Controls the family-wise error rate without assuming the
+    tests are independent, which matters because the three band widths of one
+    corpus are scored on the same records.
+    """
+    p = np.asarray(p_values, dtype=float)
+    order = np.argsort(p)
+    scaled = (len(p) - np.arange(len(p))) * p[order]
+    adjusted = np.minimum(np.maximum.accumulate(scaled), 1.0)
+    out = np.empty_like(adjusted)
+    out[order] = adjusted
+    return out
+
+
 def cohens_d_label(d):
     """Conventional magnitude bands for Cohen's d (Cohen, 1988)."""
     ad = abs(d)
